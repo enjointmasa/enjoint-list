@@ -129,7 +129,6 @@ const { useState, useEffect, useCallback } = React;
 const CLIENT_ID = "02da59cd-2903-4cdb-b519-4df3ecf79bcb";
 const TENANT_ID = "f0796f06-778d-4183-b5d9-4cce701de452";
 const SITE_NAME = "enjoint-kanri";
-const HOSTNAME  = "enjoint.sharepoint.com";
 const SCOPES    = ["Sites.ReadWrite.All", "User.Read"];
 const TYPES     = ["", "新規", "引き継ぎ"];
 const COLS_D    = "130px 68px 54px 54px 62px minmax(90px,1fr) 56px 54px 106px minmax(90px,1fr) 66px 62px 56px 56px 52px";
@@ -199,9 +198,15 @@ let _siteId = null, _listId = null, _fieldMap = null;
 
 async function ensureIds(token) {
   if (_siteId && _listId && _fieldMap) return;
-  const site = await graphFetch(token, `/sites/${HOSTNAME}:/sites/${SITE_NAME}`);
+
+  // ホスト名をハードコードせず、サイト名で検索して自動解決
+  const searchRes = await graphFetch(token, `/sites?search=${encodeURIComponent(SITE_NAME)}`);
+  dbg("site検索結果: " + JSON.stringify((searchRes.value||[]).map(s=>s.name+"("+s.webUrl+")")));
+  let site = (searchRes.value||[]).find(s => s.name === SITE_NAME);
+  if (!site) site = (searchRes.value||[]).find(s => (s.displayName||"").includes(SITE_NAME) || (s.name||"").includes(SITE_NAME));
+  if (!site) throw new Error("サイト '" + SITE_NAME + "' が見つかりません。SharePointサイト名を確認してください。");
   _siteId = site.id;
-  dbg("siteId: " + _siteId);
+  dbg("siteId: " + _siteId + " url=" + site.webUrl);
 
   // リスト一覧を取得して名前で検索
   const lists = await graphFetch(token, `/sites/${_siteId}/lists?$select=id,displayName`);
