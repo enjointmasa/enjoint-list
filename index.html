@@ -596,7 +596,7 @@ function App() {
   const [filterMonth, setFilterMonth] = useState("");
 
   const showToast = msg => { setToast(msg); setTimeout(()=>setToast(""), 3000); };
-  const showError = msg => { showErr(msg); showToast("⚠️ " + msg.substring(0, 40)); };
+  const showError = msg => { dbg("❌ ERROR: " + msg); showErr(msg); showToast("⚠️ " + msg.substring(0, 40)); };
 
   const loadData = useCallback(async () => {
     setLoading(true);
