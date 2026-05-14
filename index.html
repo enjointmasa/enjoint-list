@@ -93,14 +93,34 @@
 <div id="root"><div class="loading-screen"><div style="font-size:36px">⏳</div><div style="font-size:16px">読み込み中...</div></div></div>
 
 <script>
-/* エラーキャッチ */
 function showErr(msg) {
   var e = document.getElementById('err');
+  if (!msg) { e.style.display = 'none'; e.innerHTML = ''; return; }
   e.style.display = 'block';
-  e.textContent = msg;
+  // XSS対策としてtextContentで設定後、閉じるボタンを追加
+  var text = document.createElement('span');
+  text.textContent = msg;
+  var btn = document.createElement('span');
+  btn.textContent = '✕';
+  btn.setAttribute('style','float:right;cursor:pointer;font-weight:700;padding:0 6px;font-size:16px');
+  btn.onclick = function(){ e.style.display='none'; };
+  e.innerHTML = '';
+  e.appendChild(text);
+  e.appendChild(btn);
 }
-window.onerror = function(m,s,l) { showErr('JS Error: ' + m + ' (' + l + ')'); };
-window.onunhandledrejection = function(e) { showErr('Promise Error: ' + (e.reason && e.reason.message || e.reason || e)); };
+// MSALの内部エラー（リダイレクト処理中の正常な動作）はユーザーに見せない
+var _MSAL_IGNORE = ['in_mem_redirect','storeAuthState','cookie','BrowserAuthError','interaction_in_progress'];
+window.onerror = function(m,s,l) {
+  if (!m) return;
+  for (var i=0;i<_MSAL_IGNORE.length;i++) { if (m.indexOf(_MSAL_IGNORE[i])>=0) return true; }
+  showErr('エラー: ' + m);
+};
+window.onunhandledrejection = function(ev) {
+  var msg = String(ev.reason && ev.reason.message || ev.reason || '');
+  if (!msg) return;
+  for (var i=0;i<_MSAL_IGNORE.length;i++) { if (msg.indexOf(_MSAL_IGNORE[i])>=0) return; }
+  showErr('エラー: ' + msg);
+};
 function dbg(msg) { console.log('[DBG]', msg); }
 </script>
 
@@ -477,6 +497,7 @@ function App() {
       const token = await getToken();
       const items = await fetchItems(token);
       setRecords(items);
+      showErr(""); // 成功したら前のエラーをクリア
       dbg("loaded " + items.length + " items");
     } catch(e) {
       showError("データ読み込みエラー: " + e.message);
@@ -487,11 +508,12 @@ function App() {
   useEffect(() => {
     (async () => {
       try {
-        await msalApp.handleRedirectPromise();
-        const accounts = msalApp.getAllAccounts();
-        dbg("accounts: " + accounts.length);
-        if (accounts.length > 0) {
-          setUserName(accounts[0].name || accounts[0].username || "");
+        // リダイレクト認証後の処理（戻り値でアカウントを取得）
+        const result = await msalApp.handleRedirectPromise();
+        const account = result ? result.account : (msalApp.getAllAccounts()[0] || null);
+        dbg("auth result: " + (result?"redirect":"silent") + " account:" + (account?account.username:"none"));
+        if (account) {
+          setUserName(account.name || account.username || "");
           setAuthState("app");
           await loadData();
         } else {
@@ -504,10 +526,14 @@ function App() {
     })();
   }, []);
 
+  const [loginLoading, setLoginLoading] = useState(false);
   const handleLogin = async () => {
+    setLoginLoading(true);
     try {
       await msalApp.loginRedirect({ scopes: SCOPES });
+      // loginRedirect はページ遷移するのでここには到達しない
     } catch(e) {
+      setLoginLoading(false);
       showError("ログインエラー: " + e.message);
     }
   };
@@ -520,13 +546,14 @@ function App() {
       const token = await getToken();
       if (modal === "new") {
         const res = await createItem(token, form);
-        setRecords(prev => [...prev, { ...form, id: res.id }]);
+        setRecords(prev => [...prev, { ...form, id: res.id || res.fields?.id || String(Date.now()) }]);
         showToast("✓ 追加しました");
       } else {
         await updateItem(token, modal.id, form);
         setRecords(prev => prev.map(r => r.id === modal.id ? { ...form, id: r.id } : r));
         showToast("✓ 保存しました");
       }
+      showErr(""); // 保存成功したら前のエラーをクリア
       setModal(null);
     } catch(e) {
       showError("保存エラー: " + e.message);
@@ -575,14 +602,18 @@ function App() {
         <div style={{ fontSize:52 }}>📋</div>
         <h2>エンジョイント<br/>クライアント進捗確認リスト</h2>
         <p>会社のMicrosoftアカウントでログインしてください</p>
-        <button className="btn-ms" onClick={handleLogin}>
-          <svg width="22" height="22" viewBox="0 0 21 21" fill="none">
-            <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
-            <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
-            <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
-            <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
-          </svg>
-          Microsoftアカウントでログイン
+        <button className="btn-ms" onClick={handleLogin} disabled={loginLoading} style={{ opacity: loginLoading ? 0.7 : 1 }}>
+          {loginLoading ? (
+            <span style={{ fontSize:20 }}>⏳</span>
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 21 21" fill="none">
+              <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+              <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+              <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+              <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+            </svg>
+          )}
+          {loginLoading ? "Microsoftにリダイレクト中..." : "Microsoftアカウントでログイン"}
         </button>
       </div>
     </div>
