@@ -199,12 +199,23 @@ let _siteId = null, _listId = null, _fieldMap = null;
 async function ensureIds(token) {
   if (_siteId && _listId && _fieldMap) return;
 
-  // ホスト名をハードコードせず、サイト名で検索して自動解決
-  const searchRes = await graphFetch(token, `/sites?search=${encodeURIComponent(SITE_NAME)}`);
-  dbg("site検索結果: " + JSON.stringify((searchRes.value||[]).map(s=>s.name+"("+s.webUrl+")")));
-  let site = (searchRes.value||[]).find(s => s.name === SITE_NAME);
-  if (!site) site = (searchRes.value||[]).find(s => (s.displayName||"").includes(SITE_NAME) || (s.name||"").includes(SITE_NAME));
-  if (!site) throw new Error("サイト '" + SITE_NAME + "' が見つかりません。SharePointサイト名を確認してください。");
+  // Step1: ルートサイトからテナントのSharePointホスト名を自動取得
+  const root = await graphFetch(token, `/sites/root?$select=id,webUrl`);
+  const spHostname = new URL(root.webUrl).hostname; // 例: contoso.sharepoint.com
+  dbg("SP hostname: " + spHostname);
+
+  // Step2: 取得したホスト名でサイトにアクセス
+  let site;
+  try {
+    site = await graphFetch(token, `/sites/${spHostname}:/sites/${SITE_NAME}?$select=id,webUrl,displayName`);
+  } catch(e) {
+    // サイトが見つからない場合は検索にフォールバック
+    dbg("直接アクセス失敗: " + e.message + " → 検索");
+    const searchRes = await graphFetch(token, `/sites?search=${encodeURIComponent(SITE_NAME)}`);
+    dbg("site検索結果: " + JSON.stringify((searchRes.value||[]).map(s=>s.name+"("+s.webUrl+")")));
+    site = (searchRes.value||[]).find(s => s.name === SITE_NAME || (s.displayName||"").includes(SITE_NAME));
+    if (!site) throw new Error("SharePointサイト '" + SITE_NAME + "' が見つかりません。サイト名を確認してください。検索結果: " + (searchRes.value||[]).map(s=>s.name).join(","));
+  }
   _siteId = site.id;
   dbg("siteId: " + _siteId + " url=" + site.webUrl);
 
