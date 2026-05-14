@@ -2,215 +2,312 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>状況確認リスト</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet" />
   <style>
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body { margin: 0; padding: 0; font-family: 'Noto Sans JP', sans-serif; background: #F0F4FA; }
-    #error-box { display: none; position: fixed; top: 0; left: 0; right: 0; background: #FEF2F2; border-bottom: 2px solid #EF4444; padding: 12px 16px; font-size: 12px; color: #991B1B; z-index: 9999; white-space: pre-wrap; word-break: break-all; }
-    #loading-box { min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: #64748B; }
-    input, textarea, button, select { font-family: 'Noto Sans JP', sans-serif; }
+    /* iOS Safari: font-size < 16px のinputはズームされて入力不能になる → 全て16px以上 */
+    input, textarea, select, button { font-family: 'Noto Sans JP', sans-serif; font-size: 16px; touch-action: manipulation; }
     .desktop-only { display: block; }
     .mobile-only  { display: none; }
     @media (max-width: 768px) {
       .desktop-only { display: none !important; }
       .mobile-only  { display: block !important; }
     }
+    /* エラー表示 */
+    #err { display: none; position: fixed; top: 0; left: 0; right: 0; background: #FEF2F2; border-bottom: 3px solid #EF4444; padding: 10px 16px; font-size: 13px; color: #991B1B; z-index: 9999; white-space: pre-wrap; word-break: break-all; }
+    /* ローディング */
+    .loading-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: #64748B; }
+    /* ログイン */
+    .login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg,#1E3A5F,#2563EB); padding: 16px; }
+    .login-box { background: #fff; border-radius: 20px; padding: 40px 28px; width: 100%; max-width: 360px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+    .login-box h2 { color: #1E3A5F; font-size: 18px; margin: 16px 0 8px; line-height: 1.5; }
+    .login-box p  { color: #64748B; font-size: 14px; margin: 0 0 28px; }
+    .btn-ms { width: 100%; padding: 16px; border-radius: 12px; border: none; background: #2563EB; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    /* カード */
     .record-card { background: #fff; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #E2E8F0; }
     .record-card.done { border-left-color: #22C55E; background: #F0FDF4; }
     .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
-    .card-name { font-size: 16px; font-weight: 700; color: #1E293B; }
-    .card-sub  { font-size: 12px; color: #64748B; margin-top: 2px; }
-    .type-badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
+    .card-name { font-size: 17px; font-weight: 700; color: #1E293B; }
+    .card-sub  { font-size: 13px; color: #64748B; margin-top: 2px; }
+    .type-badge { font-size: 12px; font-weight: 700; border-radius: 6px; padding: 2px 8px; }
     .type-shinki    { color: #2563EB; background: #EFF6FF; }
     .type-hikitsugi { color: #7C3AED; background: #F5F3FF; }
     .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
-    .status-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
-    .s-on { background: #EFF6FF; color: #2563EB; }
-    .s-off { background: #F8FAFC; color: #94A3B8; }
-    .s-dis { background: #F1F5F9; color: #CBD5E1; }
-    .s-pur { background: #F5F3FF; color: #7C3AED; }
-    .sdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .sdot-on  { background: #2563EB; }
-    .sdot-off { background: #CBD5E1; }
-    .sdot-pur { background: #7C3AED; }
+    .si { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+    .si-on  { background: #EFF6FF; color: #2563EB; }
+    .si-off { background: #F8FAFC; color: #94A3B8; }
+    .si-dis { background: #F1F5F9; color: #CBD5E1; }
+    .si-pur { background: #F5F3FF; color: #7C3AED; }
+    .sd { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .sd-on  { background: #2563EB; }
+    .sd-off { background: #CBD5E1; }
+    .sd-pur { background: #7C3AED; }
     .card-actions { display: flex; gap: 8px; margin-top: 12px; }
-    .card-actions button { flex: 1; padding: 10px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
-    .btn-edit   { background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }
-    .btn-del    { background: #FFF5F5; color: #EF4444; border: 1px solid #FEE2E2; }
-    .memo-box   { font-size: 12px; color: #64748B; background: #F8FAFC; border-radius: 6px; padding: 6px 10px; margin-top: 6px; }
+    .card-actions button { flex: 1; padding: 12px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .btn-edit { background: #EFF6FF; color: #2563EB; border: 1.5px solid #BFDBFE; }
+    .btn-del  { background: #FFF5F5; color: #EF4444; border: 1.5px solid #FEE2E2; }
+    .memo-box { font-size: 13px; color: #64748B; background: #F8FAFC; border-radius: 6px; padding: 6px 10px; margin-top: 6px; }
+    /* フィルター */
     .filter-bar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
     @media (min-width: 769px) { .filter-bar { flex-direction: row; flex-wrap: wrap; align-items: center; } }
-    .filter-bar input { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1.5px solid #CBD5E1; font-size: 14px; outline: none; background: #fff; }
-    @media (min-width: 769px) { .filter-bar input { width: auto; } }
-    .btn-excel { width: 100%; padding: 11px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1.5px solid #16A34A; background: #F0FDF4; color: #16A34A; }
-    @media (min-width: 769px) { .btn-excel { width: auto; } }
-    .btn-add { width: 100%; padding: 12px; border-radius: 10px; border: none; background: linear-gradient(135deg,#1E3A5F,#2563EB); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 12px; }
-    @media (min-width: 769px) { .btn-add { width: auto; margin-left: auto; padding: 8px 18px; font-size: 13px; margin-bottom: 0; } }
-    .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 100; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-    .modal-box { background: #fff; width: 100%; max-width: 460px; padding: 20px 16px 60px; margin: 0 auto; min-height: 100vh; }
-    @media (min-width: 769px) { .modal-box { border-radius: 16px; padding: 28px; min-height: auto; margin: 20px auto; } }
-    .inp { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1.5px solid #CBD5E1; font-size: 16px; outline: none; font-family: 'Noto Sans JP', sans-serif; -webkit-appearance: none; }
-    @media (min-width: 769px) { .inp { padding: 8px 12px; font-size: 14px; border-radius: 8px; } }
-    .lbl { display: block; font-size: 12px; color: #64748B; margin-bottom: 5px; font-weight: 600; }
-    .fld { margin-bottom: 12px; }
-    .chk-row { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 12px 14px; border-radius: 10px; border: 1.5px solid #E2E8F0; background: #F8FAFC; margin-bottom: 8px; user-select: none; }
+    .filter-bar input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1.5px solid #CBD5E1; font-size: 16px; outline: none; background: #fff; -webkit-appearance: none; }
+    @media (min-width: 769px) { .filter-bar input { width: auto; font-size: 13px; padding: 8px 12px; } }
+    .btn-excel { padding: 12px 14px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; border: 1.5px solid #16A34A; background: #F0FDF4; color: #16A34A; width: 100%; }
+    @media (min-width: 769px) { .btn-excel { width: auto; font-size: 13px; padding: 8px 12px; } }
+    .btn-add { width: 100%; padding: 14px; border-radius: 10px; border: none; background: linear-gradient(135deg,#1E3A5F,#2563EB); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; }
+    @media (min-width: 769px) { .btn-add { width: auto; margin-left: auto; font-size: 13px; padding: 8px 18px; } }
+    .btn-refresh { padding: 12px 14px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; border: 1.5px solid #2563EB; background: #EFF6FF; color: #2563EB; width: 100%; }
+    @media (min-width: 769px) { .btn-refresh { width: auto; font-size: 13px; padding: 8px 12px; } }
+    /* モーダル: iOSで固定位置+スクロールの組み合わせが壊れるのでシンプルに */
+    .modal-wrap { position: fixed; inset: 0; z-index: 100; overflow-y: auto; -webkit-overflow-scrolling: touch; background: rgba(15,23,42,0.6); }
+    .modal-box { background: #fff; width: 100%; max-width: 480px; margin: 0 auto; padding: 24px 16px 80px; min-height: 100vh; }
+    @media (min-width: 769px) { .modal-box { border-radius: 16px; padding: 28px; min-height: auto; margin: 30px auto; } }
+    /* 入力欄: iOS対策で全て16px以上・-webkit-appearance:none */
+    .inp { display: block; width: 100%; padding: 14px; border-radius: 10px; border: 1.5px solid #CBD5E1; font-size: 16px; font-family: 'Noto Sans JP', sans-serif; outline: none; background: #fff; -webkit-appearance: none; color: #1E293B; }
+    .inp:focus { border-color: #2563EB; }
+    @media (min-width: 769px) { .inp { padding: 10px 12px; font-size: 14px; border-radius: 8px; } }
+    .lbl { display: block; font-size: 13px; color: #64748B; margin-bottom: 6px; font-weight: 600; }
+    .fld { margin-bottom: 14px; }
+    /* チェックボックス行: タップ領域を広く */
+    .chk-row { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 12px; border: 1.5px solid #E2E8F0; background: #F8FAFC; margin-bottom: 10px; cursor: pointer; -webkit-user-select: none; user-select: none; }
     .chk-row.active-blue   { border-color: #2563EB; background: #EFF6FF; }
     .chk-row.active-purple { border-color: #7C3AED; background: #F5F3FF; }
-    .chk-row.disabled { opacity: 0.5; cursor: not-allowed; }
-    .chk-lbl { font-size: 14px; font-weight: 600; color: #475569; flex: 1; }
+    .chk-row.disabled { opacity: 0.45; pointer-events: none; }
+    .chk-lbl { font-size: 15px; font-weight: 600; color: #475569; flex: 1; line-height: 1.4; }
     .chk-lbl.blue   { color: #2563EB; }
     .chk-lbl.purple { color: #7C3AED; }
-    .chk-note { font-size: 11px; font-weight: 400; margin-left: 6px; color: #94A3B8; }
-    .login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg,#1E3A5F 0%,#2563EB 100%); padding: 16px; }
-    .login-box { background: #fff; border-radius: 20px; padding: 40px 32px; width: 100%; max-width: 360px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-    .login-box h2 { color: #1E3A5F; font-size: 18px; margin: 16px 0 8px; line-height: 1.5; }
-    .login-box p  { color: #64748B; font-size: 13px; margin: 0 0 28px; }
-    .btn-ms { width: 100%; padding: 14px; border-radius: 10px; border: none; background: #2563EB; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-family: 'Noto Sans JP', sans-serif; }
-    .btn-ms:hover { background: #1d4ed8; }
-    .toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: #1E3A5F; color: #fff; padding: 10px 24px; border-radius: 20px; font-size: 13px; font-weight: 600; z-index: 200; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    .chk-note { font-size: 12px; font-weight: 400; margin-left: 6px; color: #94A3B8; }
+    .chk-box { width: 24px; height: 24px; border-radius: 6px; border: 2px solid #CBD5E1; background: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .chk-box.checked      { background: #2563EB; border-color: #2563EB; }
+    .chk-box.checked-pur  { background: #7C3AED; border-color: #7C3AED; }
+    .chk-tick { color: #fff; font-size: 14px; line-height: 1; }
+    /* トースト */
+    .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1E3A5F; color: #fff; padding: 12px 24px; border-radius: 20px; font-size: 14px; font-weight: 600; z-index: 300; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    /* デバッグパネル */
+    #debug { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #1E293B; color: #94A3B8; font-size: 11px; padding: 8px 12px; z-index: 200; max-height: 200px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; word-break: break-all; }
+    #debug-close { position: fixed; bottom: 204px; right: 8px; z-index: 201; background: #475569; color: #fff; border: none; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
   </style>
 </head>
 <body>
-<div id="error-box"></div>
-<div id="root"><div id="loading-box"><div style="font-size:32px">⏳</div><div>読み込み中...</div></div></div>
+<div id="err"></div>
+<div id="root"><div class="loading-screen"><div style="font-size:36px">⏳</div><div style="font-size:16px">読み込み中...</div></div></div>
+<button id="debug-close" onclick="document.getElementById('debug').style.display='none';this.style.display='none';" style="display:none">✕ 閉じる</button>
+<div id="debug"></div>
 
 <script>
-window.onerror = function(msg, src, line, col, err) {
-  var box = document.getElementById('error-box');
-  if (box) { box.style.display = 'block'; box.textContent = 'エラー: ' + msg + '\n' + (src||'') + ':' + line; }
-};
-window.onunhandledrejection = function(e) {
-  var box = document.getElementById('error-box');
-  if (box) { box.style.display = 'block'; box.textContent = 'Promise エラー: ' + (e.reason || e); }
-};
+/* エラーキャッチ */
+function showErr(msg) {
+  var e = document.getElementById('err');
+  e.style.display = 'block';
+  e.textContent = msg;
+}
+window.onerror = function(m,s,l) { showErr('JS Error: ' + m + ' (' + l + ')'); };
+window.onunhandledrejection = function(e) { showErr('Promise Error: ' + (e.reason && e.reason.message || e.reason || e)); };
+function dbg(msg) {
+  var d = document.getElementById('debug');
+  var btn = document.getElementById('debug-close');
+  d.style.display = 'block';
+  if (btn) btn.style.display = 'block';
+  d.textContent += '\n' + msg;
+  d.scrollTop = d.scrollHeight;
+}
 </script>
 
-<!-- ライブラリを順番に読み込む -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js" onerror="showErr('MSALの読み込みに失敗しました')"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" onerror="showErr('Reactの読み込みに失敗しました')"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback } = React;
+
 /* ===== 設定 ===== */
 const CLIENT_ID = "02da59cd-2903-4cdb-b519-4df3ecf79bcb";
 const TENANT_ID = "f0796f06-778d-4183-b5d9-4cce701de452";
 const SITE_NAME = "enjoint-kanri";
-const LIST_NAME = "受給者証・契約 対応状況確認表";
 const HOSTNAME  = "enjoint.sharepoint.com";
 const SCOPES    = ["Sites.ReadWrite.All", "User.Read"];
-
-const COLS_D = "130px 68px 54px 54px 62px minmax(90px,1fr) 56px 54px 106px minmax(90px,1fr) 66px 62px 56px 56px 52px";
-const TYPES  = ["", "新規", "引き継ぎ"];
+const TYPES     = ["", "新規", "引き継ぎ"];
+const COLS_D    = "130px 68px 54px 54px 62px minmax(90px,1fr) 56px 54px 106px minmax(90px,1fr) 66px 62px 56px 56px 52px";
 
 /* ===== MSAL ===== */
-let msalInstance;
+let msalApp;
 try {
-  msalInstance = new msal.PublicClientApplication({
+  msalApp = new msal.PublicClientApplication({
     auth: {
       clientId: CLIENT_ID,
       authority: "https://login.microsoftonline.com/" + TENANT_ID,
-      redirectUri: window.location.href.split("?")[0].split("#")[0],
+      redirectUri: "https://enjointmasa.github.io/enjoint-list/",
     },
-    cache: { cacheLocation: "sessionStorage", storeAuthStateInCookie: true },
+    cache: {
+      cacheLocation: "localStorage",  // mobileのredirect後もセッション維持
+      storeAuthStateInCookie: true,
+    },
   });
+  dbg("MSAL OK");
 } catch(e) {
-  document.getElementById('error-box').style.display = 'block';
-  document.getElementById('error-box').textContent = 'MSAL初期化エラー: ' + e.message;
+  showErr("MSAL初期化エラー: " + e.message);
 }
 
 /* ===== Graph API ===== */
 async function getToken() {
-  const accounts = msalInstance.getAllAccounts();
-  if (!accounts.length) throw new Error("未ログイン");
+  const accounts = msalApp.getAllAccounts();
+  if (!accounts.length) throw new Error("ログインが必要です");
   try {
-    const r = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+    const r = await msalApp.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
     return r.accessToken;
-  } catch(e) {
-    const r = await msalInstance.acquireTokenPopup({ scopes: SCOPES, account: accounts[0] });
-    return r.accessToken;
+  } catch(silentErr) {
+    dbg("silent token fail: " + silentErr.message + " → popup試行");
+    try {
+      const r = await msalApp.acquireTokenPopup({ scopes: SCOPES, account: accounts[0] });
+      return r.accessToken;
+    } catch(popupErr) {
+      dbg("popup fail: " + popupErr.message + " → redirect");
+      // モバイルでpopupがブロックされた場合はredirectにフォールバック
+      await msalApp.acquireTokenRedirect({ scopes: SCOPES, account: accounts[0] });
+      throw new Error("認証のためリダイレクト中...");
+    }
   }
 }
 
-async function apiFetch(token, url, opts) {
-  const base = "https://graph.microsoft.com/v1.0";
-  const res = await fetch(base + url, {
+async function graphFetch(token, path, opts = {}) {
+  const res = await fetch("https://graph.microsoft.com/v1.0" + path, {
     ...opts,
-    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", ...(opts&&opts.headers) }
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
   });
-  if (opts && opts.method === "DELETE") return null;
-  return res.json();
+  if (opts.method === "DELETE") {
+    if (!res.ok) throw new Error("削除失敗 HTTP " + res.status);
+    return null;
+  }
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch { throw new Error("JSONパース失敗 HTTP " + res.status + ": " + text.slice(0,200)); }
+  if (!res.ok || json.error) {
+    const msg = (json.error && json.error.message) || ("HTTP " + res.status);
+    dbg("graphFetch error " + path + ": " + msg);
+    throw new Error(msg);
+  }
+  return json;
 }
 
-async function getSiteId(token) {
-  const d = await apiFetch(token, "/sites/" + HOSTNAME + ":/sites/" + SITE_NAME);
-  return d.id;
+/* SharePointサイト・リストIDをキャッシュ */
+let _siteId = null, _listId = null, _fieldMap = null;
+
+async function ensureIds(token) {
+  if (_siteId && _listId && _fieldMap) return;
+  const site = await graphFetch(token, `/sites/${HOSTNAME}:/sites/${SITE_NAME}`);
+  _siteId = site.id;
+  dbg("siteId: " + _siteId);
+
+  // リスト一覧を取得して名前で検索
+  const lists = await graphFetch(token, `/sites/${_siteId}/lists?$select=id,displayName`);
+  dbg("lists: " + lists.value.map(l => l.displayName).join(", "));
+
+  // 完全一致 → なければ部分一致
+  let list = lists.value.find(l => l.displayName === "受給者証・契約 対応状況確認表");
+  if (!list) list = lists.value.find(l => l.displayName.includes("受給者証"));
+  if (!list) list = lists.value.find(l => l.displayName.includes("対応状況"));
+  if (!list) { dbg("利用可能なリスト: " + JSON.stringify(lists.value.map(l=>l.displayName))); throw new Error("リストが見つかりません。リスト名を確認してください。"); }
+  _listId = list.id;
+  dbg("listId: " + _listId + " (" + list.displayName + ")");
+
+  // フィールド内部名マップを作成
+  const cols = await graphFetch(token, `/sites/${_siteId}/lists/${_listId}/columns`);
+  _fieldMap = {};
+  cols.value.forEach(c => { _fieldMap[c.displayName] = c.name; });
+  dbg("fields: " + JSON.stringify(_fieldMap));
 }
 
-async function getListId(token, siteId) {
-  const d = await apiFetch(token, "/sites/" + siteId + "/lists?$filter=displayName eq '" + encodeURIComponent(LIST_NAME) + "'");
-  return d.value && d.value[0] && d.value[0].id;
+function fName(displayName) {
+  // 内部名が取れていればそれを使う、なければ表示名をそのまま
+  return (_fieldMap && _fieldMap[displayName]) || displayName;
 }
 
-function fieldsToRecord(item) {
+function itemToRecord(item) {
   const f = item.fields || {};
+  // デバッグ: 最初のアイテムのフィールドを表示
+  dbg("sample fields: " + Object.keys(f).slice(0,10).join(", "));
   return {
     id:           item.id,
-    name:         f["名前"]          || f["Title"] || "",
-    area:         f["市町村"]         || "",
-    type:         f["種別"]           || "",
-    cityMeeting:  !!f["市役所面談"],
-    scheduleDate: f["契約予定日"]     || "",
-    memo1:        f["備考①"]          || "",
-    contracted:   !!f["契約完了"],
-    changeNotice: !!f["変更届"],
-    planApp:      !!f["計画案等提出"],
-    memo2:        f["備考②"]          || "",
-    received:     !!f["受給者証受取"],
-    meetingHeld:  f["担当者会議日程"] || "",
-    planSubmit:   !!f["計画書提出"],
-    aura:         !!f["AURA取込"],
+    name:         f[fName("名前")]          || f.Title || f["名前"] || "",
+    area:         f[fName("市町村")]         || f["市町村"] || "",
+    type:         f[fName("種別")]           || f["種別"] || "",
+    cityMeeting:  !!(f[fName("市役所面談")] ?? f["市役所面談"]),
+    scheduleDate: f[fName("契約予定日")]     || f["契約予定日"] || "",
+    memo1:        f[fName("備考①")]          || f["備考①"] || "",
+    contracted:   !!(f[fName("契約完了")]    ?? f["契約完了"]),
+    changeNotice: !!(f[fName("変更届")]      ?? f["変更届"]),
+    planApp:      !!(f[fName("計画案等提出")]?? f["計画案等提出"]),
+    memo2:        f[fName("備考②")]          || f["備考②"] || "",
+    received:     !!(f[fName("受給者証受取")]?? f["受給者証受取"]),
+    meetingHeld:  f[fName("担当者会議日程")] || f["担当者会議日程"] || "",
+    planSubmit:   !!(f[fName("計画書提出")] ?? f["計画書提出"]),
+    aura:         !!(f[fName("AURA取込")]    ?? f["AURA取込"]),
   };
 }
 
 function recordToFields(r) {
-  return {
-    Title: r.name, "名前": r.name, "市町村": r.area, "種別": r.type,
-    "市役所面談": r.cityMeeting, "契約予定日": r.scheduleDate, "備考①": r.memo1,
-    "契約完了": r.contracted, "変更届": r.changeNotice, "計画案等提出": r.planApp,
-    "備考②": r.memo2, "受給者証受取": r.received, "担当者会議日程": r.meetingHeld,
-    "計画書提出": r.planSubmit, "AURA取込": r.aura,
-  };
+  const m = {};
+  m["Title"] = r.name || "";
+  // 内部名マッピング済みの列のみ設定（未マップ列はスキップ）
+  function setField(displayName, value) {
+    if (!_fieldMap) return;
+    const internal = _fieldMap[displayName];
+    if (!internal) { dbg("未マップ列: " + displayName); return; }
+    if (internal === "Title") return; // Title は上で設定済み
+    m[internal] = value;
+  }
+  setField("名前",          r.name || "");
+  setField("市町村",         r.area || "");
+  setField("種別",           r.type || "");
+  setField("市役所面談",     !!r.cityMeeting);
+  setField("契約予定日",     r.scheduleDate || "");
+  setField("備考①",          r.memo1 || "");
+  setField("契約完了",       !!r.contracted);
+  setField("変更届",         !!r.changeNotice);
+  setField("計画案等提出",   !!r.planApp);
+  setField("備考②",          r.memo2 || "");
+  setField("受給者証受取",   !!r.received);
+  setField("担当者会議日程", r.meetingHeld || "");
+  setField("計画書提出",     !!r.planSubmit);
+  setField("AURA取込",       !!r.aura);
+  dbg("送信fields: " + JSON.stringify(m));
+  return m;
 }
 
-async function fetchItems(token, siteId, listId) {
-  const d = await apiFetch(token, "/sites/" + siteId + "/lists/" + listId + "/items?expand=fields&$top=500");
-  return (d.value || []).map(fieldsToRecord);
+async function fetchItems(token) {
+  await ensureIds(token);
+  const d = await graphFetch(token, `/sites/${_siteId}/lists/${_listId}/items?expand=fields&$top=500`);
+  return (d.value || []).map((item, i) => { if(i===0) dbg("first item fields: "+JSON.stringify(Object.keys(item.fields||{}))); return itemToRecord(item); });
 }
 
-async function createItem(token, siteId, listId, record) {
-  return apiFetch(token, "/sites/" + siteId + "/lists/" + listId + "/items", {
+async function createItem(token, record) {
+  await ensureIds(token);
+  return graphFetch(token, `/sites/${_siteId}/lists/${_listId}/items`, {
     method: "POST", body: JSON.stringify({ fields: recordToFields(record) })
   });
 }
 
-async function updateItem(token, siteId, listId, itemId, record) {
-  return apiFetch(token, "/sites/" + siteId + "/lists/" + listId + "/items/" + itemId + "/fields", {
+async function updateItem(token, itemId, record) {
+  await ensureIds(token);
+  return graphFetch(token, `/sites/${_siteId}/lists/${_listId}/items/${itemId}/fields`, {
     method: "PATCH", body: JSON.stringify(recordToFields(record))
   });
 }
 
-async function deleteItem(token, siteId, listId, itemId) {
-  return apiFetch(token, "/sites/" + siteId + "/lists/" + listId + "/items/" + itemId, { method: "DELETE" });
+async function deleteItem(token, itemId) {
+  await ensureIds(token);
+  return graphFetch(token, `/sites/${_siteId}/lists/${_listId}/items/${itemId}`, { method: "DELETE" });
 }
 
-/* ===== ユーティリティフック ===== */
+/* ===== UIコンポーネント ===== */
 function useIsMobile() {
-  const [v, setV] = React.useState(window.innerWidth <= 768);
-  React.useEffect(() => {
+  const [v, setV] = useState(window.innerWidth <= 768);
+  useEffect(() => {
     const h = () => setV(window.innerWidth <= 768);
     window.addEventListener("resize", h);
     return () => window.removeEventListener("resize", h);
@@ -218,206 +315,218 @@ function useIsMobile() {
   return v;
 }
 
-function useToast() {
-  const [msg, setMsg] = React.useState("");
-  const show = m => { setMsg(m); setTimeout(() => setMsg(""), 2500); };
-  const el = msg ? React.createElement("div", { className: "toast" }, msg) : null;
-  return [el, show];
-}
-
-/* ===== チェックボックス行 ===== */
-function ChkRow({ checked, onChange, disabled, color, label, note, mobile }) {
-  const isPurple = color === "#7C3AED";
-  const cls = "chk-row" + (disabled ? " disabled" : checked ? (isPurple ? " active-purple" : " active-blue") : "");
-  const lblCls = "chk-lbl" + (!disabled && checked ? (isPurple ? " purple" : " blue") : "");
-  if (mobile) {
-    return (
-      React.createElement("div", { className: cls, onClick: () => !disabled && onChange(!checked) },
-        React.createElement("input", { type: "checkbox", checked: !!checked, readOnly: true, disabled, style: { width:22, height:22, accentColor: color||"#2563EB", flexShrink:0 } }),
-        React.createElement("span", { className: lblCls },
-          label, note && React.createElement("span", { className: "chk-note" }, note)
-        )
-      )
-    );
-  }
+/* チェックボックス行（ネイティブcheckboxを使わずdivでタップ制御） */
+function ChkRow({ checked, onChange, disabled, purple, label, note }) {
+  const boxCls = "chk-box" + (checked ? (purple ? " checked-pur" : " checked") : "");
+  const rowCls = "chk-row" + (disabled ? " disabled" : checked ? (purple ? " active-purple" : " active-blue") : "");
+  const lblCls = "chk-lbl" + (checked && !disabled ? (purple ? " purple" : " blue") : "");
   return (
-    React.createElement("label", { className: cls },
-      React.createElement("input", { type: "checkbox", checked: !!checked, onChange: e => !disabled && onChange(e.target.checked), disabled, style: { width:18, height:18, accentColor: color||"#2563EB", marginTop:1, flexShrink:0 } }),
-      React.createElement("span", { className: lblCls },
-        label, note && React.createElement("span", { className: "chk-note" }, note)
-      )
-    )
+    <div className={rowCls} onClick={() => !disabled && onChange(!checked)}>
+      <div className={boxCls}>{checked && <span className="chk-tick">✓</span>}</div>
+      <span className={lblCls}>{label}{note && <span className="chk-note">{note}</span>}</span>
+    </div>
   );
 }
 
-/* ===== モーダル ===== */
-function Modal({ record, onClose, onSave, isMobile, saving }) {
+/* モーダル */
+function Modal({ record, onClose, onSave, saving }) {
   const blank = { name:"", area:"", type:"", cityMeeting:false, scheduleDate:"", memo1:"", contracted:false, changeNotice:false, planApp:false, received:false, meetingHeld:"", memo2:"", planSubmit:false, aura:false };
-  const [form, setForm] = React.useState(record ? { ...blank, ...record } : blank);
-  const set = (k, v) => setForm(f => ({ ...f, [k]:v }));
-  const isHK = form.type === "引き継ぎ";
+  const [form, setForm] = useState(record ? { ...blank, ...record } : blank);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const isSN = form.type === "新規";
-  const Chk = (props) => React.createElement(ChkRow, { ...props, mobile: isMobile });
-  const Field = ({ label, children }) => React.createElement("div", { className: "fld" },
-    React.createElement("label", { className: "lbl" }, label), children);
+  const isHK = form.type === "引き継ぎ";
 
-  return React.createElement("div", { className: "modal-overlay", onClick: e => e.target === e.currentTarget && onClose() },
-    React.createElement("div", { className: "modal-box" },
-      React.createElement("h3", { style: { margin:"0 0 18px", fontSize:17, color:"#1E3A5F", fontWeight:700 } }, record ? "✏️ 編集" : "➕ 新規追加"),
-      React.createElement(Field, { label:"名前" }, React.createElement("input", { value:form.name, onChange:e=>set("name",e.target.value), placeholder:"例: 山田 太郎", className:"inp" })),
-      React.createElement(Field, { label:"市町村" }, React.createElement("input", { value:form.area, onChange:e=>set("area",e.target.value), placeholder:"例: 前橋市", className:"inp" })),
-      React.createElement(Field, { label:"種別" },
-        React.createElement("div", { style:{display:"flex",gap:8} },
-          TYPES.filter(Boolean).map(t =>
-            React.createElement("label", { key:t, style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"12px 8px",borderRadius:10,border:`1.5px solid ${form.type===t?"#2563EB":"#E2E8F0"}`,background:form.type===t?"#EFF6FF":"#F8FAFC",cursor:"pointer"} },
-              React.createElement("input", { type:"radio", name:"type", value:t, checked:form.type===t, onChange:()=>set("type",t), style:{accentColor:"#2563EB"} }),
-              React.createElement("span", { style:{fontSize:14,fontWeight:600,color:form.type===t?"#2563EB":"#94A3B8"} }, t)
-            )
-          )
-        )
-      ),
-      React.createElement(Chk, { checked:form.cityMeeting, onChange:v=>set("cityMeeting",v), disabled:!isSN, color:"#2563EB", label:"市役所面談", note:"（新規のみ）" }),
-      React.createElement(Field, { label:"契約予定日" }, React.createElement("input", { value:form.scheduleDate, onChange:e=>set("scheduleDate",e.target.value), placeholder:"例: 5/10", className:"inp" })),
-      React.createElement(Field, { label:"備考①" }, React.createElement("textarea", { value:form.memo1, onChange:e=>set("memo1",e.target.value), rows:2, className:"inp", style:{resize:"vertical"} })),
-      React.createElement(Chk, { checked:form.contracted, onChange:v=>set("contracted",v), label:"契約完了" }),
-      React.createElement(Chk, { checked:form.changeNotice, onChange:v=>set("changeNotice",v), disabled:!isHK, color:"#7C3AED", label:"変更届", note:"（引き継ぎのみ）" }),
-      React.createElement(Chk, { checked:form.planApp, onChange:v=>set("planApp",v), disabled:!isSN, color:"#2563EB", label:"計画案等書類・支給申請書・計画相談依頼届提出", note:"（新規のみ）" }),
-      React.createElement(Field, { label:"備考②" }, React.createElement("textarea", { value:form.memo2, onChange:e=>set("memo2",e.target.value), rows:2, className:"inp", style:{resize:"vertical"} })),
-      React.createElement(Chk, { checked:form.received, onChange:v=>set("received",v), label:"受給者証受取" }),
-      React.createElement("div", { className:"fld", style:{opacity:isSN?1:0.5} },
-        React.createElement("label", { className:"lbl", style:{color:isSN?"#2563EB":"#94A3B8"} }, "担当者会議日程", React.createElement("span", { style:{fontSize:11,fontWeight:400,marginLeft:6} }, "（新規のみ）")),
-        React.createElement("input", { value:form.meetingHeld, onChange:e=>isSN&&set("meetingHeld",e.target.value), disabled:!isSN, placeholder:"例: 5/20", className:"inp", style:{background:isSN?"#fff":"#F1F5F9",color:isSN?"#1E293B":"#94A3B8"} })
-      ),
-      React.createElement(Chk, { checked:form.planSubmit, onChange:v=>set("planSubmit",v), disabled:!isSN, color:"#2563EB", label:"計画書の提出", note:"（新規のみ）" }),
-      React.createElement(Chk, { checked:form.aura, onChange:v=>set("aura",v), label:"AURA取込" }),
-      React.createElement("div", { style:{display:"flex",gap:10,marginTop:20} },
-        React.createElement("button", { onClick:onClose, disabled:saving, style:{flex:1,padding:"13px 0",borderRadius:10,border:"1.5px solid #CBD5E1",background:"#fff",cursor:"pointer",fontSize:15,color:"#64748B",fontWeight:600} }, "キャンセル"),
-        React.createElement("button", { onClick:()=>onSave(form), disabled:saving, style:{flex:2,padding:"13px 0",borderRadius:10,border:"none",background:"linear-gradient(135deg,#1E3A5F,#2563EB)",cursor:"pointer",fontSize:15,color:"#fff",fontWeight:700} }, saving?"保存中...":"保存")
-      )
-    )
+  return (
+    <div className="modal-wrap">
+      <div className="modal-box">
+        <h3 style={{ margin:"0 0 20px", fontSize:18, color:"#1E3A5F", fontWeight:700 }}>
+          {record ? "✏️ 編集" : "➕ 新規追加"}
+        </h3>
+
+        <div className="fld">
+          <label className="lbl">名前</label>
+          <input className="inp" value={form.name} onChange={e => set("name", e.target.value)} placeholder="例: 山田 太郎" autoComplete="off" inputMode="text" onFocus={e => setTimeout(()=>e.target.scrollIntoView({behavior:"smooth",block:"center"}),350)} />
+        </div>
+        <div className="fld">
+          <label className="lbl">市町村</label>
+          <input className="inp" value={form.area} onChange={e => set("area", e.target.value)} placeholder="例: 前橋市" autoComplete="off" inputMode="text" onFocus={e => setTimeout(()=>e.target.scrollIntoView({behavior:"smooth",block:"center"}),350)} />
+        </div>
+        <div className="fld">
+          <label className="lbl">種別</label>
+          <div style={{ display:"flex", gap:8 }}>
+            {TYPES.filter(Boolean).map(t => (
+              <div key={t} onClick={() => set("type", t)}
+                style={{ flex:1, padding:"14px 8px", borderRadius:12, border:`2px solid ${form.type===t?"#2563EB":"#E2E8F0"}`, background:form.type===t?"#EFF6FF":"#F8FAFC", textAlign:"center", cursor:"pointer" }}>
+                <span style={{ fontSize:15, fontWeight:700, color:form.type===t?"#2563EB":"#94A3B8" }}>{t}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <ChkRow checked={form.cityMeeting} onChange={v=>set("cityMeeting",v)} disabled={!isSN} label="市役所面談" note="（新規のみ）" />
+
+        <div className="fld">
+          <label className="lbl">契約予定日</label>
+          <input className="inp" value={form.scheduleDate} onChange={e=>set("scheduleDate",e.target.value)} placeholder="例: 5/10" autoComplete="off" inputMode="text" onFocus={e=>setTimeout(()=>e.target.scrollIntoView({behavior:"smooth",block:"center"}),350)} />
+        </div>
+        <div className="fld">
+          <label className="lbl">備考①</label>
+          <textarea className="inp" value={form.memo1} onChange={e=>set("memo1",e.target.value)} rows={3} style={{ resize:"vertical" }} onFocus={e=>setTimeout(()=>e.target.scrollIntoView({behavior:"smooth",block:"center"}),350)} />
+        </div>
+
+        <ChkRow checked={form.contracted}   onChange={v=>set("contracted",v)}   label="契約完了" />
+        <ChkRow checked={form.changeNotice} onChange={v=>set("changeNotice",v)} disabled={!isHK} purple label="変更届" note="（引き継ぎのみ）" />
+        <ChkRow checked={form.planApp}      onChange={v=>set("planApp",v)}      disabled={!isSN} label="計画案等書類・支給申請書・計画相談依頼届提出" note="（新規のみ）" />
+
+        <div className="fld">
+          <label className="lbl">備考②</label>
+          <textarea className="inp" value={form.memo2} onChange={e=>set("memo2",e.target.value)} rows={3} style={{ resize:"vertical" }} onFocus={e=>setTimeout(()=>e.target.scrollIntoView({behavior:"smooth",block:"center"}),350)} />
+        </div>
+
+        <ChkRow checked={form.received} onChange={v=>set("received",v)} label="受給者証受取" />
+
+        <div className="fld" style={{ opacity:isSN?1:0.5 }}>
+          <label className="lbl" style={{ color:isSN?"#2563EB":"#94A3B8" }}>担当者会議日程 <span style={{ fontSize:12, fontWeight:400 }}>（新規のみ）</span></label>
+          <input className="inp" value={form.meetingHeld} onChange={e=>isSN&&set("meetingHeld",e.target.value)} disabled={!isSN} placeholder="例: 5/20" autoComplete="off" inputMode="text" style={{ background:isSN?"#fff":"#F1F5F9" }} onFocus={e=>setTimeout(()=>e.target.scrollIntoView({behavior:"smooth",block:"center"}),350)} />
+        </div>
+
+        <ChkRow checked={form.planSubmit} onChange={v=>set("planSubmit",v)} disabled={!isSN} label="計画書の提出" note="（新規のみ）" />
+        <ChkRow checked={form.aura}       onChange={v=>set("aura",v)}       label="AURA取込" />
+
+        <div style={{ display:"flex", gap:10, marginTop:24 }}>
+          <button onClick={onClose} disabled={saving} style={{ flex:1, padding:"16px", borderRadius:12, border:"1.5px solid #CBD5E1", background:"#fff", fontSize:16, color:"#64748B", fontWeight:600, cursor:"pointer" }}>キャンセル</button>
+          <button onClick={() => onSave(form)} disabled={saving} style={{ flex:2, padding:"16px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#1E3A5F,#2563EB)", fontSize:16, color:"#fff", fontWeight:700, cursor:"pointer" }}>
+            {saving ? "保存中..." : "保存"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
-/* ===== カードビュー ===== */
+/* カード */
 function RecordCard({ r, onEdit, onDelete }) {
-  const allDone = r.contracted && r.received && r.aura;
-  const isSN = r.type === "新規", isHK = r.type === "引き継ぎ";
-  const SI = ({ on, disabled, label, purple }) => {
-    const c = disabled?"s-dis":on?(purple?"s-pur":"s-on"):"s-off";
-    const d = disabled?"sdot-off":on?(purple?"sdot-pur":"sdot-on"):"sdot-off";
-    return React.createElement("div", { className:"status-item "+c },
-      React.createElement("div", { className:"sdot "+d }), React.createElement("span", null, label));
-  };
-  return React.createElement("div", { className:"record-card"+(allDone?" done":"") },
-    React.createElement("div", { className:"card-header" },
-      React.createElement("div", null,
-        React.createElement("div", { style:{display:"flex",alignItems:"center",gap:8} },
-          React.createElement("span", { className:"card-name" }, r.name),
-          r.type && React.createElement("span", { className:"type-badge "+(r.type==="新規"?"type-shinki":"type-hikitsugi") }, r.type)
-        ),
-        React.createElement("div", { className:"card-sub" }, r.area+(r.scheduleDate?"　契約予定: "+r.scheduleDate:""))
-      ),
-      allDone && React.createElement("span", { style:{fontSize:11,background:"#22C55E",color:"#fff",borderRadius:20,padding:"3px 10px",whiteSpace:"nowrap",fontWeight:700} }, "完了")
-    ),
-    (r.memo1||r.memo2) && React.createElement("div", { className:"memo-box" },
-      r.memo1&&React.createElement("div",null,"📝 "+r.memo1), r.memo2&&React.createElement("div",null,"📝 "+r.memo2)),
-    React.createElement("div", { className:"status-grid" },
-      React.createElement(SI,{on:r.contracted,label:"契約完了"}),
-      React.createElement(SI,{on:r.received,label:"受給者証受取"}),
-      React.createElement(SI,{on:r.aura,label:"AURA取込"}),
-      React.createElement(SI,{on:r.cityMeeting,label:"市役所面談",disabled:!isSN}),
-      React.createElement(SI,{on:r.planApp,label:"計画案等提出",disabled:!isSN}),
-      React.createElement(SI,{on:r.planSubmit,label:"計画書提出",disabled:!isSN}),
-      React.createElement(SI,{on:r.changeNotice,label:"変更届",purple:true,disabled:!isHK}),
-      isSN && React.createElement("div",{className:"status-item "+(r.meetingHeld?"s-on":"s-off")},
-        React.createElement("div",{className:"sdot "+(r.meetingHeld?"sdot-on":"sdot-off")}),
-        React.createElement("span",null,"担当者会議"+(r.meetingHeld?": "+r.meetingHeld:"")))
-    ),
-    React.createElement("div", { className:"card-actions" },
-      React.createElement("button",{className:"btn-edit",onClick:onEdit},"✏️ 編集"),
-      React.createElement("button",{className:"btn-del",onClick:onDelete},"🗑 削除")
-    )
+  const done = r.contracted && r.received && r.aura;
+  const isSN = r.type==="新規", isHK = r.type==="引き継ぎ";
+  const SI = ({ on, dis, purple, label }) => (
+    <div className={"si "+(dis?"si-dis":on?(purple?"si-pur":"si-on"):"si-off")}>
+      <div className={"sd "+(dis?"sd-off":on?(purple?"sd-pur":"sd-on"):"sd-off")} />
+      {label}
+    </div>
+  );
+  return (
+    <div className={"record-card"+(done?" done":"")}>
+      <div className="card-header">
+        <div>
+          <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+            <span className="card-name">{r.name}</span>
+            {r.type && <span className={"type-badge "+(r.type==="新規"?"type-shinki":"type-hikitsugi")}>{r.type}</span>}
+          </div>
+          <div className="card-sub">{r.area}{r.scheduleDate?"　契約予定: "+r.scheduleDate:""}</div>
+        </div>
+        {done && <span style={{ fontSize:12, background:"#22C55E", color:"#fff", borderRadius:20, padding:"4px 12px", fontWeight:700 }}>完了</span>}
+      </div>
+      {(r.memo1||r.memo2) && <div className="memo-box">{r.memo1&&<div>📝 {r.memo1}</div>}{r.memo2&&<div>📝 {r.memo2}</div>}</div>}
+      <div className="status-grid">
+        <SI on={r.contracted}   label="契約完了" />
+        <SI on={r.received}     label="受給者証受取" />
+        <SI on={r.aura}         label="AURA取込" />
+        <SI on={r.cityMeeting}  dis={!isSN} label="市役所面談" />
+        <SI on={r.planApp}      dis={!isSN} label="計画案等提出" />
+        <SI on={r.planSubmit}   dis={!isSN} label="計画書提出" />
+        <SI on={r.changeNotice} dis={!isHK} purple label="変更届" />
+        {isSN && <div className={"si "+(r.meetingHeld?"si-on":"si-off")}><div className={"sd "+(r.meetingHeld?"sd-on":"sd-off")} />担当者会議{r.meetingHeld?": "+r.meetingHeld:""}</div>}
+      </div>
+      <div className="card-actions">
+        <button className="btn-edit" onClick={onEdit}>✏️ 編集</button>
+        <button className="btn-del"  onClick={onDelete}>🗑 削除</button>
+      </div>
+    </div>
   );
 }
 
-/* ===== DisplayCheck（デスクトップ用） ===== */
 function DisplayCheck({ checked, disabled }) {
-  if (disabled) return React.createElement("div",{style:{display:"flex",justifyContent:"center"}},
-    React.createElement("div",{style:{width:22,height:22,borderRadius:5,border:"1.5px solid #E2E8F0",background:"#F1F5F9",display:"flex",alignItems:"center",justifyContent:"center"}},
-      React.createElement("span",{style:{color:"#D1D5DB",fontSize:10}},"—")));
-  return React.createElement("div",{style:{display:"flex",justifyContent:"center"}},
-    React.createElement("div",{style:{width:22,height:22,borderRadius:5,border:`2px solid ${checked?"#2563EB":"#CBD5E1"}`,background:checked?"#2563EB":"#fff",display:"flex",alignItems:"center",justifyContent:"center"}},
-      checked&&React.createElement("span",{style:{color:"#fff",fontSize:13,lineHeight:1}},"✓")));
+  if (disabled) return <div style={{ display:"flex", justifyContent:"center" }}><div style={{ width:22, height:22, borderRadius:5, border:"1.5px solid #E2E8F0", background:"#F1F5F9", display:"flex", alignItems:"center", justifyContent:"center" }}><span style={{ color:"#D1D5DB", fontSize:10 }}>—</span></div></div>;
+  return <div style={{ display:"flex", justifyContent:"center" }}><div style={{ width:22, height:22, borderRadius:5, border:`2px solid ${checked?"#2563EB":"#CBD5E1"}`, background:checked?"#2563EB":"#fff", display:"flex", alignItems:"center", justifyContent:"center" }}>{checked&&<span style={{ color:"#fff", fontSize:13 }}>✓</span>}</div></div>;
 }
 
 /* ===== メインApp ===== */
 function App() {
   const isMobile = useIsMobile();
-  const [toastEl, showToast] = useToast();
-  const [authState, setAuthState] = React.useState("loading");
-  const [userName,  setUserName]  = React.useState("");
-  const [siteId,    setSiteId]    = React.useState(null);
-  const [listId,    setListId]    = React.useState(null);
-  const [records,   setRecords]   = React.useState([]);
-  const [filterName,  setFilterName]  = React.useState("");
-  const [filterArea,  setFilterArea]  = React.useState("");
-  const [filterMonth, setFilterMonth] = React.useState("");
-  const [modal,   setModal]   = React.useState(null);
-  const [saving,  setSaving]  = React.useState(false);
-  const [loading, setLoading] = React.useState(false);
+  const [authState, setAuthState] = useState("loading");
+  const [userName, setUserName]   = useState("");
+  const [records,  setRecords]    = useState([]);
+  const [loading,  setLoading]    = useState(false);
+  const [saving,   setSaving]     = useState(false);
+  const [modal,    setModal]      = useState(null);
+  const [toast,    setToast]      = useState("");
+  const [filterName,  setFilterName]  = useState("");
+  const [filterArea,  setFilterArea]  = useState("");
+  const [filterMonth, setFilterMonth] = useState("");
 
-  const loadData = async () => {
+  const showToast = msg => { setToast(msg); setTimeout(()=>setToast(""), 3000); };
+  const showError = msg => { showErr(msg); showToast("⚠️ " + msg.substring(0, 40)); };
+
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const token = await getToken();
-      const sid = await getSiteId(token);
-      const lid = await getListId(token, sid);
-      setSiteId(sid); setListId(lid);
-      setRecords(await fetchItems(token, sid, lid));
-    } catch(e) { console.error(e); showToast("データ取得失敗: " + e.message); }
+      const items = await fetchItems(token);
+      setRecords(items);
+      dbg("loaded " + items.length + " items");
+    } catch(e) {
+      showError("データ読み込みエラー: " + e.message);
+    }
     setLoading(false);
-  };
+  }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     (async () => {
       try {
-        await msalInstance.handleRedirectPromise();
-        const accounts = msalInstance.getAllAccounts();
+        await msalApp.handleRedirectPromise();
+        const accounts = msalApp.getAllAccounts();
+        dbg("accounts: " + accounts.length);
         if (accounts.length > 0) {
-          setUserName(accounts[0].name || accounts[0].username);
-          await loadData();
+          setUserName(accounts[0].name || accounts[0].username || "");
           setAuthState("app");
+          await loadData();
         } else {
           setAuthState("login");
         }
       } catch(e) {
-        console.error("認証エラー:", e);
+        dbg("auth error: " + e.message);
         setAuthState("login");
       }
     })();
   }, []);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     try {
-      if (!msalInstance) { showToast("MSALが読み込まれていません"); return; }
-      msalInstance.loginRedirect({ scopes: SCOPES }).catch(e => showToast("ログインエラー: " + e.message));
-    } catch(e) { showToast("ログインエラー: " + e.message); }
+      await msalApp.loginRedirect({ scopes: SCOPES });
+    } catch(e) {
+      showError("ログインエラー: " + e.message);
+    }
   };
-  const handleLogout = () => msalInstance.logoutRedirect();
+
+  const handleLogout = () => msalApp.logoutRedirect();
 
   const handleSave = async form => {
     setSaving(true);
     try {
       const token = await getToken();
       if (modal === "new") {
-        const res = await createItem(token, siteId, listId, form);
+        const res = await createItem(token, form);
         setRecords(prev => [...prev, { ...form, id: res.id }]);
+        showToast("✓ 追加しました");
       } else {
-        await updateItem(token, siteId, listId, modal.id, form);
+        await updateItem(token, modal.id, form);
         setRecords(prev => prev.map(r => r.id === modal.id ? { ...form, id: r.id } : r));
+        showToast("✓ 保存しました");
       }
-      showToast("✓ 保存しました"); setModal(null);
-    } catch(e) { showToast("保存失敗: " + e.message); }
+      setModal(null);
+    } catch(e) {
+      showError("保存エラー: " + e.message);
+    }
     setSaving(false);
   };
 
@@ -425,149 +534,172 @@ function App() {
     if (!window.confirm("削除しますか？")) return;
     try {
       const token = await getToken();
-      await deleteItem(token, siteId, listId, id);
+      await deleteItem(token, id);
       setRecords(prev => prev.filter(r => r.id !== id));
       showToast("削除しました");
-    } catch(e) { showToast("削除失敗: " + e.message); }
+    } catch(e) {
+      showError("削除エラー: " + e.message);
+    }
   };
 
   const exportExcel = () => {
     const ws = XLSX.utils.json_to_sheet(records.map(r => ({
       名前:r.name, 市町村:r.area, 種別:r.type,
-      市役所面談:r.type==="新規"?(r.cityMeeting?"✓":""):"―",
-      契約予定日:r.scheduleDate, 備考:r.memo1,
-      契約完了:r.contracted?"✓":"",
-      変更届:r.type==="引き継ぎ"?(r.changeNotice?"✓":""):"―",
-      "計画案等書類":r.type==="新規"?(r.planApp?"✓":""):"―",
-      備考2:r.memo2, 受給者証受取:r.received?"✓":"",
-      担当者会議日程:r.type==="新規"?(r.meetingHeld||""):"―",
-      計画書提出:r.type==="新規"?(r.planSubmit?"✓":""):"―",
-      AURA取込:r.aura?"✓":"",
+      市役所面談:r.type==="新規"?(r.cityMeeting?"✓":""):"―", 契約予定日:r.scheduleDate, 備考:r.memo1,
+      契約完了:r.contracted?"✓":"", 変更届:r.type==="引き継ぎ"?(r.changeNotice?"✓":""):"―",
+      計画案等:r.type==="新規"?(r.planApp?"✓":""):"―", 備考2:r.memo2,
+      受給者証受取:r.received?"✓":"", 担当者会議:r.type==="新規"?(r.meetingHeld||""):"―",
+      計画書提出:r.type==="新規"?(r.planSubmit?"✓":""):"―", AURA取込:r.aura?"✓":"",
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "確認表");
     XLSX.writeFile(wb, "受給者証・契約 対応状況確認表.xlsx");
   };
 
-  if (authState === "loading") return React.createElement("div", { id:"loading-box" },
-    React.createElement("div",{style:{fontSize:32}},"⏳"), React.createElement("div",null,"読み込み中..."));
-
-  if (authState === "login") return React.createElement("div", { className:"login-screen" },
-    React.createElement("div", { className:"login-box" },
-      React.createElement("div",{style:{fontSize:48}},"📋"),
-      React.createElement("h2",null,"エンジョイント",React.createElement("br"),"クライアント進捗確認リスト"),
-      React.createElement("p",null,"会社のMicrosoftアカウントでログインしてください"),
-      React.createElement("button",{className:"btn-ms",onClick:handleLogin},
-        React.createElement("svg",{width:20,height:20,viewBox:"0 0 21 21",fill:"none"},
-          React.createElement("rect",{x:1,y:1,width:9,height:9,fill:"#F25022"}),
-          React.createElement("rect",{x:11,y:1,width:9,height:9,fill:"#7FBA00"}),
-          React.createElement("rect",{x:1,y:11,width:9,height:9,fill:"#00A4EF"}),
-          React.createElement("rect",{x:11,y:11,width:9,height:9,fill:"#FFB900"})
-        ),
-        "Microsoftアカウントでログイン"
-      )
-    )
+  /* ローディング */
+  if (authState === "loading") return (
+    <div className="loading-screen">
+      <div style={{ fontSize:40 }}>⏳</div>
+      <div style={{ fontSize:16 }}>読み込み中...</div>
+    </div>
   );
 
+  /* ログイン */
+  if (authState === "login") return (
+    <div className="login-screen">
+      <div className="login-box">
+        <div style={{ fontSize:52 }}>📋</div>
+        <h2>エンジョイント<br/>クライアント進捗確認リスト</h2>
+        <p>会社のMicrosoftアカウントでログインしてください</p>
+        <button className="btn-ms" onClick={handleLogin}>
+          <svg width="22" height="22" viewBox="0 0 21 21" fill="none">
+            <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+            <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+            <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+            <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+          </svg>
+          Microsoftアカウントでログイン
+        </button>
+      </div>
+    </div>
+  );
+
+  /* メイン */
   const filtered = records.filter(r =>
-    (!filterArea||r.area.includes(filterArea)) &&
-    (!filterName||r.name.includes(filterName)) &&
-    (!filterMonth||r.scheduleDate.startsWith(filterMonth))
+    (!filterArea  || r.area.includes(filterArea)) &&
+    (!filterName  || r.name.includes(filterName)) &&
+    (!filterMonth || r.scheduleDate.startsWith(filterMonth))
   );
   const total=records.length, cont=records.filter(r=>r.contracted).length,
         recv=records.filter(r=>r.received).length, aura=records.filter(r=>r.aura).length,
         meet=records.filter(r=>r.meetingHeld).length;
 
   const HDR=[
-    {l:"名前"},{l:"市町村"},{l:"種別"},
-    {l:"市役所\n面談",n:"新規",nc:"#60A5FA"},{l:"契約予定日"},{l:"備考"},{l:"契約完了"},
-    {l:"変更届",n:"引継",nc:"#A78BFA"},{l:"計画案等書類\n支給申請書等",n:"新規",nc:"#60A5FA"},
-    {l:"備考"},{l:"受給者証\n受取"},{l:"担当者会議\n日程",n:"新規",nc:"#60A5FA"},
-    {l:"計画書\nの提出",n:"新規",nc:"#60A5FA"},{l:"AURA\n取込"},{l:""},
+    {l:"名前"},{l:"市町村"},{l:"種別"},{l:"市役所\n面談",n:"新規",nc:"#60A5FA"},
+    {l:"契約予定日"},{l:"備考"},{l:"契約完了"},{l:"変更届",n:"引継",nc:"#A78BFA"},
+    {l:"計画案等書類\n支給申請書等",n:"新規",nc:"#60A5FA"},{l:"備考"},{l:"受給者証\n受取"},
+    {l:"担当者会議\n日程",n:"新規",nc:"#60A5FA"},{l:"計画書\nの提出",n:"新規",nc:"#60A5FA"},
+    {l:"AURA\n取込"},{l:""},
   ];
 
-  return React.createElement("div", { style:{minHeight:"100vh",background:"#F0F4FA"} },
-    toastEl,
-    /* ヘッダー */
-    React.createElement("div",{style:{background:"linear-gradient(135deg,#1E3A5F 0%,#2563EB 100%)",padding:isMobile?"14px 14px 12px":"18px 16px 16px",color:"#fff"}},
-      React.createElement("div",{style:{maxWidth:1500,margin:"0 auto"}},
-        React.createElement("div",{style:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}},
-          React.createElement("div",null,
-            React.createElement("p",{style:{margin:0,fontSize:10,opacity:0.7,letterSpacing:2}},"エンジョイント"),
-            React.createElement("h1",{style:{margin:"3px 0 0",fontSize:isMobile?14:17,fontWeight:700,lineHeight:1.4}},"状況確認リスト（契約日・書類提出・受給者証受領等）")
-          ),
-          React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}},
-            React.createElement("span",{style:{fontSize:11,opacity:0.8}},userName),
-            React.createElement("button",{onClick:handleLogout,style:{fontSize:11,background:"rgba(255,255,255,0.2)",border:"none",color:"#fff",padding:"3px 10px",borderRadius:20,cursor:"pointer"}},"ログアウト")
-          )
-        ),
-        React.createElement("div",{style:{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}},
-          [["対象者",total,"rgba(255,255,255,0.15)"],["契約完了",cont,"rgba(110,231,183,0.25)"],["受取済",recv,"rgba(110,231,183,0.25)"],["担当者会議",meet,"rgba(196,181,253,0.3)"],["AURA取込",aura,"rgba(147,197,253,0.3)"]].map(([label,val,bg])=>
-            React.createElement("div",{key:label,style:{background:bg,borderRadius:10,padding:"6px 12px",textAlign:"center",minWidth:52}},
-              React.createElement("div",{style:{fontSize:18,fontWeight:700}},val),
-              React.createElement("div",{style:{fontSize:10,opacity:0.85}},label)))
-        )
-      )
-    ),
-    /* コンテンツ */
-    React.createElement("div",{style:{maxWidth:1500,margin:"0 auto",padding:isMobile?"12px 12px 40px":"14px 12px 40px"}},
-      React.createElement("div",{className:"filter-bar"},
-        React.createElement("input",{value:filterName,onChange:e=>setFilterName(e.target.value),placeholder:"🔍 名前で検索"}),
-        React.createElement("input",{value:filterArea,onChange:e=>setFilterArea(e.target.value),placeholder:"🗺 市町村で検索"}),
-        React.createElement("input",{value:filterMonth,onChange:e=>setFilterMonth(e.target.value),placeholder:"📅 契約月で検索 例:5"}),
-        React.createElement("button",{onClick:exportExcel,className:"btn-excel"},"📥 Excel出力"),
-        React.createElement("button",{onClick:loadData,style:{padding:"11px 14px",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",border:"1.5px solid #2563EB",background:"#EFF6FF",color:"#2563EB"}},"🔄 更新"),
-        React.createElement("button",{onClick:()=>setModal("new"),className:"btn-add"},"＋ 新規追加")
-      ),
-      loading && React.createElement("div",{style:{textAlign:"center",padding:32,color:"#94A3B8"}},"読み込み中..."),
-      /* モバイルカード */
-      React.createElement("div",{className:"mobile-only"},
-        !loading&&filtered.length===0&&React.createElement("div",{style:{padding:32,textAlign:"center",color:"#94A3B8",background:"#fff",borderRadius:14}},"該当なし"),
-        filtered.map(r=>React.createElement(RecordCard,{key:r.id,r,onEdit:()=>setModal(r),onDelete:()=>handleDelete(r.id)}))
-      ),
-      /* デスクトップテーブル */
-      React.createElement("div",{className:"desktop-only",style:{borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,0.08)",overflowX:"auto"}},
-        React.createElement("div",{style:{minWidth:1100}},
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:COLS_D,background:"#1E3A5F",padding:"0 8px"}},
-            HDR.map((h,i)=>React.createElement("div",{key:i,style:{padding:"9px 4px",textAlign:"center",whiteSpace:"pre-line",lineHeight:1.35,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#CBD5E1"}},
-              React.createElement("span",null,h.l),
-              h.n&&React.createElement("span",{style:{fontSize:9,color:h.nc,fontWeight:700,marginTop:1}},"▶"+h.n)))
-          ),
-          !loading&&filtered.length===0&&React.createElement("div",{style:{padding:32,textAlign:"center",color:"#94A3B8",background:"#fff"}},"該当なし"),
-          filtered.map((r,i)=>{
-            const done=r.contracted&&r.received&&r.aura, isHK=r.type==="引き継ぎ", isSN=r.type==="新規";
-            const bg=done?"#F0FDF4":i%2===0?"#fff":"#FAFBFC";
-            return React.createElement("div",{key:r.id,style:{display:"grid",gridTemplateColumns:COLS_D,padding:"8px",alignItems:"start",borderBottom:"1px solid #F1F5F9",background:bg}},
-              React.createElement("span",{style:{fontSize:13,fontWeight:600,color:"#1E293B",paddingTop:2}},r.name),
-              React.createElement("span",{style:{fontSize:12,color:"#475569",paddingTop:2}},r.area),
-              React.createElement("div",{style:{paddingTop:1}},React.createElement("span",{style:{fontSize:11,fontWeight:700,color:r.type==="新規"?"#2563EB":r.type==="引き継ぎ"?"#7C3AED":"#CBD5E1",background:r.type==="新規"?"#EFF6FF":r.type==="引き継ぎ"?"#F5F3FF":"transparent",borderRadius:6,padding:r.type?"2px 4px":0,display:"inline-block"}},r.type||"—")),
-              React.createElement("div",{style:{paddingTop:3}},React.createElement(DisplayCheck,{checked:r.cityMeeting,disabled:!isSN})),
-              React.createElement("span",{style:{fontSize:12,color:"#64748B",textAlign:"center",paddingTop:2}},r.scheduleDate),
-              React.createElement("span",{style:{fontSize:12,color:"#64748B",whiteSpace:"pre-wrap",wordBreak:"break-all",lineHeight:1.5}},r.memo1),
-              React.createElement("div",{style:{paddingTop:3}},React.createElement(DisplayCheck,{checked:r.contracted})),
-              React.createElement("div",{style:{paddingTop:3}},React.createElement(DisplayCheck,{checked:r.changeNotice,disabled:!isHK})),
-              React.createElement("div",{style:{paddingTop:3}},React.createElement(DisplayCheck,{checked:r.planApp,disabled:!isSN})),
-              React.createElement("span",{style:{fontSize:12,color:"#64748B",whiteSpace:"pre-wrap",wordBreak:"break-all",lineHeight:1.5}},r.memo2),
-              React.createElement("div",{style:{paddingTop:3}},React.createElement(DisplayCheck,{checked:r.received})),
-              React.createElement("div",{style:{paddingTop:3,display:"flex",justifyContent:"center"}},
-                isSN?React.createElement("span",{style:{fontSize:12,color:r.meetingHeld?"#64748B":"#CBD5E1",textAlign:"center"}},r.meetingHeld||"—"):React.createElement("span",{style:{fontSize:11,color:"#D1D5DB"}},"—")),
-              React.createElement("div",{style:{paddingTop:3}},React.createElement(DisplayCheck,{checked:r.planSubmit,disabled:!isSN})),
-              React.createElement("div",{style:{paddingTop:3}},React.createElement(DisplayCheck,{checked:r.aura})),
-              React.createElement("span",{style:{display:"flex",gap:4,paddingTop:1}},
-                React.createElement("button",{onClick:()=>setModal(r),style:{padding:"5px 8px",borderRadius:6,border:"1px solid #BFDBFE",background:"#EFF6FF",cursor:"pointer",fontSize:14,lineHeight:1}},"✏️"),
-                React.createElement("button",{onClick:()=>handleDelete(r.id),style:{padding:"5px 8px",borderRadius:6,border:"1px solid #FEE2E2",background:"#FFF5F5",cursor:"pointer",fontSize:14,lineHeight:1}},"🗑"))
-            );
-          })
-        )
-      ),
-      React.createElement("p",{style:{textAlign:"center",fontSize:12,color:"#94A3B8",marginTop:12}},
-        filtered.length+"件表示 / 全"+records.length+"件　｜　データはSharePointに保存されます")
-    ),
-    modal&&React.createElement(Modal,{record:modal==="new"?null:modal,onClose:()=>setModal(null),onSave:handleSave,isMobile,saving})
+  return (
+    <div style={{ minHeight:"100vh", background:"#F0F4FA" }}>
+      {toast && <div className="toast">{toast}</div>}
+
+      {/* ヘッダー */}
+      <div style={{ background:"linear-gradient(135deg,#1E3A5F,#2563EB)", padding:isMobile?"14px 14px 12px":"18px 16px 16px", color:"#fff" }}>
+        <div style={{ maxWidth:1500, margin:"0 auto" }}>
+          <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:8 }}>
+            <div>
+              <p style={{ margin:0, fontSize:11, opacity:0.7, letterSpacing:2 }}>エンジョイント</p>
+              <h1 style={{ margin:"4px 0 0", fontSize:isMobile?15:17, fontWeight:700, lineHeight:1.4 }}>状況確認リスト（契約日・書類提出・受給者証受領等）</h1>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 }}>
+              <span style={{ fontSize:12, opacity:0.8 }}>{userName}</span>
+              <button onClick={handleLogout} style={{ fontSize:12, background:"rgba(255,255,255,0.2)", border:"none", color:"#fff", padding:"5px 12px", borderRadius:20, cursor:"pointer" }}>ログアウト</button>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
+            {[["対象者",total,"rgba(255,255,255,0.15)"],["契約完了",cont,"rgba(110,231,183,0.25)"],["受取済",recv,"rgba(110,231,183,0.25)"],["担当者会議",meet,"rgba(196,181,253,0.3)"],["AURA取込",aura,"rgba(147,197,253,0.3)"]].map(([l,v,bg])=>(
+              <div key={l} style={{ background:bg, borderRadius:10, padding:"6px 14px", textAlign:"center" }}>
+                <div style={{ fontSize:20, fontWeight:700 }}>{v}</div>
+                <div style={{ fontSize:11, opacity:0.85 }}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* コンテンツ */}
+      <div style={{ maxWidth:1500, margin:"0 auto", padding:isMobile?"12px 12px 40px":"14px 12px 40px" }}>
+        <div className="filter-bar">
+          <input value={filterName}  onChange={e=>setFilterName(e.target.value)}  placeholder="🔍 名前で検索" autoComplete="off" />
+          <input value={filterArea}  onChange={e=>setFilterArea(e.target.value)}  placeholder="🗺 市町村で検索" autoComplete="off" />
+          <input value={filterMonth} onChange={e=>setFilterMonth(e.target.value)} placeholder="📅 契約月 例:5" autoComplete="off" />
+          <button onClick={exportExcel} className="btn-excel">📥 Excel出力</button>
+          <button onClick={loadData}    className="btn-refresh">🔄 更新</button>
+          <button onClick={()=>setModal("new")} className="btn-add">＋ 新規追加</button>
+        </div>
+
+        {loading && <div style={{ textAlign:"center", padding:32, color:"#94A3B8", fontSize:16 }}>読み込み中...</div>}
+
+        {/* モバイル カード */}
+        <div className="mobile-only">
+          {!loading && filtered.length===0 && <div style={{ padding:32, textAlign:"center", color:"#94A3B8", background:"#fff", borderRadius:14, fontSize:16 }}>該当なし</div>}
+          {filtered.map(r => <RecordCard key={r.id} r={r} onEdit={()=>setModal(r)} onDelete={()=>handleDelete(r.id)} />)}
+        </div>
+
+        {/* デスクトップ テーブル */}
+        <div className="desktop-only" style={{ borderRadius:14, boxShadow:"0 2px 12px rgba(0,0,0,0.08)", overflowX:"auto" }}>
+          <div style={{ minWidth:1100 }}>
+            <div style={{ display:"grid", gridTemplateColumns:COLS_D, background:"#1E3A5F", padding:"0 8px" }}>
+              {HDR.map((h,i)=>(
+                <div key={i} style={{ padding:"9px 4px", textAlign:"center", whiteSpace:"pre-line", lineHeight:1.35, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color:"#CBD5E1" }}>
+                  <span>{h.l}</span>
+                  {h.n&&<span style={{ fontSize:9, color:h.nc, fontWeight:700, marginTop:1 }}>▶{h.n}</span>}
+                </div>
+              ))}
+            </div>
+            {!loading && filtered.length===0 && <div style={{ padding:32, textAlign:"center", color:"#94A3B8", background:"#fff" }}>該当なし</div>}
+            {filtered.map((r,i)=>{
+              const done=r.contracted&&r.received&&r.aura, isHK=r.type==="引き継ぎ", isSN=r.type==="新規";
+              return (
+                <div key={r.id} style={{ display:"grid", gridTemplateColumns:COLS_D, padding:"8px", alignItems:"start", borderBottom:"1px solid #F1F5F9", background:done?"#F0FDF4":i%2===0?"#fff":"#FAFBFC" }}>
+                  <span style={{ fontSize:13, fontWeight:600, color:"#1E293B", paddingTop:2 }}>{r.name}</span>
+                  <span style={{ fontSize:12, color:"#475569", paddingTop:2 }}>{r.area}</span>
+                  <div style={{ paddingTop:1 }}><span style={{ fontSize:11, fontWeight:700, color:r.type==="新規"?"#2563EB":r.type==="引き継ぎ"?"#7C3AED":"#CBD5E1", background:r.type==="新規"?"#EFF6FF":r.type==="引き継ぎ"?"#F5F3FF":"transparent", borderRadius:6, padding:r.type?"2px 4px":0, display:"inline-block" }}>{r.type||"—"}</span></div>
+                  <div style={{ paddingTop:3 }}><DisplayCheck checked={r.cityMeeting} disabled={!isSN} /></div>
+                  <span style={{ fontSize:12, color:"#64748B", textAlign:"center", paddingTop:2 }}>{r.scheduleDate}</span>
+                  <span style={{ fontSize:12, color:"#64748B", whiteSpace:"pre-wrap", wordBreak:"break-all" }}>{r.memo1}</span>
+                  <div style={{ paddingTop:3 }}><DisplayCheck checked={r.contracted} /></div>
+                  <div style={{ paddingTop:3 }}><DisplayCheck checked={r.changeNotice} disabled={!isHK} /></div>
+                  <div style={{ paddingTop:3 }}><DisplayCheck checked={r.planApp} disabled={!isSN} /></div>
+                  <span style={{ fontSize:12, color:"#64748B", whiteSpace:"pre-wrap", wordBreak:"break-all" }}>{r.memo2}</span>
+                  <div style={{ paddingTop:3 }}><DisplayCheck checked={r.received} /></div>
+                  <div style={{ paddingTop:3, display:"flex", justifyContent:"center" }}>{isSN?<span style={{ fontSize:12, color:r.meetingHeld?"#64748B":"#CBD5E1" }}>{r.meetingHeld||"—"}</span>:<span style={{ fontSize:11, color:"#D1D5DB" }}>—</span>}</div>
+                  <div style={{ paddingTop:3 }}><DisplayCheck checked={r.planSubmit} disabled={!isSN} /></div>
+                  <div style={{ paddingTop:3 }}><DisplayCheck checked={r.aura} /></div>
+                  <span style={{ display:"flex", gap:4, paddingTop:1 }}>
+                    <button onClick={()=>setModal(r)} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid #BFDBFE", background:"#EFF6FF", cursor:"pointer", fontSize:14 }}>✏️</button>
+                    <button onClick={()=>handleDelete(r.id)} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid #FEE2E2", background:"#FFF5F5", cursor:"pointer", fontSize:14 }}>🗑</button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <p style={{ textAlign:"center", fontSize:13, color:"#94A3B8", marginTop:12 }}>
+          {filtered.length}件表示 / 全{records.length}件　｜　データはSharePointに保存されます
+        </p>
+      </div>
+
+      {modal && <Modal record={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={handleSave} saving={saving} />}
+    </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
 </body>
 </html>
