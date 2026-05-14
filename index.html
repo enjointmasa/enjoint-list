@@ -93,35 +93,98 @@
 <div id="root"><div class="loading-screen"><div style="font-size:36px">⏳</div><div style="font-size:16px">読み込み中...</div></div></div>
 
 <script>
+/* ===== デバッグログ（画面で確認・コピー可能） ===== */
+var _debugLog = [];
+function dbg(msg) {
+  var t = new Date().toLocaleTimeString('ja-JP');
+  var entry = '[' + t + '] ' + msg;
+  _debugLog.push(entry);
+  if (_debugLog.length > 300) _debugLog.shift();
+  console.log('[DBG]', msg);
+  var pre = document.getElementById('dbg-pre');
+  if (pre && pre.parentElement.style.display === 'flex') {
+    pre.textContent = _debugLog.join('\n');
+    pre.scrollTop = pre.scrollHeight;
+  }
+}
+function showDebugViewer() {
+  var v = document.getElementById('dbg-viewer');
+  if (!v) {
+    v = document.createElement('div');
+    v.id = 'dbg-viewer';
+    v.style.cssText = 'position:fixed;inset:16px;background:#1E293B;z-index:10000;border-radius:12px;display:none;flex-direction:column;box-shadow:0 0 50px rgba(0,0,0,0.5);';
+    var bar = document.createElement('div');
+    bar.style.cssText = 'display:flex;gap:8px;padding:10px;background:#0F172A;border-radius:12px 12px 0 0;align-items:center;';
+    var title = document.createElement('span');
+    title.textContent = '🔍 デバッグログ';
+    title.style.cssText = 'color:#fff;font-size:14px;font-weight:700;flex:1;';
+    var copyBtn = document.createElement('button');
+    copyBtn.textContent = '📋 コピー';
+    copyBtn.style.cssText = 'background:#2563EB;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;';
+    copyBtn.onclick = function(){
+      var txt = _debugLog.join('\n');
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(txt).then(function(){
+          copyBtn.textContent = '✓ コピー済';
+          setTimeout(function(){ copyBtn.textContent = '📋 コピー'; }, 2000);
+        }).catch(function(){ alert(txt); });
+      } else { alert(txt); }
+    };
+    var closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕ 閉じる';
+    closeBtn.style.cssText = 'background:#475569;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;';
+    closeBtn.onclick = function(){ v.style.display = 'none'; };
+    bar.appendChild(title); bar.appendChild(copyBtn); bar.appendChild(closeBtn);
+    var pre = document.createElement('pre');
+    pre.id = 'dbg-pre';
+    pre.style.cssText = 'flex:1;margin:0;padding:12px;color:#94A3B8;font-family:monospace;font-size:11px;overflow:auto;white-space:pre-wrap;word-break:break-all;background:#1E293B;border-radius:0 0 12px 12px;';
+    v.appendChild(bar); v.appendChild(pre);
+    document.body.appendChild(v);
+  }
+  document.getElementById('dbg-pre').textContent = _debugLog.join('\n');
+  v.style.display = 'flex';
+  document.getElementById('dbg-pre').scrollTop = document.getElementById('dbg-pre').scrollHeight;
+}
+window.showDebugViewer = showDebugViewer;
+
+/* ===== エラー表示（閉じる・詳細ボタン付き） ===== */
 function showErr(msg) {
   var e = document.getElementById('err');
   if (!msg) { e.style.display = 'none'; e.innerHTML = ''; return; }
   e.style.display = 'block';
-  // XSS対策としてtextContentで設定後、閉じるボタンを追加
   var text = document.createElement('span');
   text.textContent = msg;
-  var btn = document.createElement('span');
-  btn.textContent = '✕';
-  btn.setAttribute('style','float:right;cursor:pointer;font-weight:700;padding:0 6px;font-size:16px');
-  btn.onclick = function(){ e.style.display='none'; };
+  text.style.cssText = 'flex:1;';
+  var detail = document.createElement('button');
+  detail.textContent = '詳細';
+  detail.style.cssText = 'background:#991B1B;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600;margin-left:8px;flex-shrink:0;';
+  detail.onclick = showDebugViewer;
+  var close = document.createElement('button');
+  close.textContent = '✕';
+  close.style.cssText = 'background:transparent;border:none;color:#991B1B;font-size:18px;font-weight:700;cursor:pointer;padding:0 4px;margin-left:4px;flex-shrink:0;';
+  close.onclick = function(){ e.style.display='none'; };
   e.innerHTML = '';
-  e.appendChild(text);
-  e.appendChild(btn);
+  e.style.cssText += ';display:flex;align-items:center;';
+  e.appendChild(text); e.appendChild(detail); e.appendChild(close);
 }
-// MSALの内部エラー（リダイレクト処理中の正常な動作）はユーザーに見せない
-var _MSAL_IGNORE = ['in_mem_redirect','storeAuthState','cookie','BrowserAuthError','interaction_in_progress'];
+/* MSALの内部エラー（正常動作の一部）はユーザーに見せない */
+var _MSAL_IGNORE = ['in_mem_redirect','storeAuthState','cookie','BrowserAuthError','interaction_in_progress','hash_empty_error','no_token_request_cache_error'];
+function _isMsalNoise(msg) {
+  if (!msg) return true;
+  for (var i=0;i<_MSAL_IGNORE.length;i++) { if (msg.indexOf(_MSAL_IGNORE[i])>=0) return true; }
+  return false;
+}
 window.onerror = function(m,s,l) {
-  if (!m) return;
-  for (var i=0;i<_MSAL_IGNORE.length;i++) { if (m.indexOf(_MSAL_IGNORE[i])>=0) return true; }
+  if (_isMsalNoise(m)) return true;
+  dbg('window.onerror: ' + m);
   showErr('エラー: ' + m);
 };
 window.onunhandledrejection = function(ev) {
   var msg = String(ev.reason && ev.reason.message || ev.reason || '');
-  if (!msg) return;
-  for (var i=0;i<_MSAL_IGNORE.length;i++) { if (msg.indexOf(_MSAL_IGNORE[i])>=0) return; }
+  if (_isMsalNoise(msg)) return;
+  dbg('unhandledrejection: ' + msg);
   showErr('エラー: ' + msg);
 };
-function dbg(msg) { console.log('[DBG]', msg); }
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -182,22 +245,40 @@ async function getToken() {
 }
 
 async function graphFetch(token, path, opts = {}) {
-  const res = await fetch("https://graph.microsoft.com/v1.0" + path, {
-    ...opts,
-    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-  });
-  if (opts.method === "DELETE") {
-    if (!res.ok) throw new Error("削除失敗 HTTP " + res.status);
+  const method = opts.method || "GET";
+  dbg("→ " + method + " " + path + (opts.body ? " body=" + String(opts.body).slice(0,200) : ""));
+  let res;
+  try {
+    res = await fetch("https://graph.microsoft.com/v1.0" + path, {
+      ...opts,
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+    });
+  } catch(networkErr) {
+    dbg("✗ ネットワークエラー " + path + ": " + networkErr.message);
+    throw new Error("ネットワークエラー [" + path + "]: " + networkErr.message);
+  }
+  if (method === "DELETE") {
+    if (!res.ok) {
+      const txt = await res.text().catch(()=>"");
+      dbg("✗ DELETE失敗 " + path + " HTTP " + res.status + " " + txt);
+      throw new Error("削除失敗 HTTP " + res.status + " [" + path + "]: " + txt.slice(0,200));
+    }
+    dbg("✓ DELETE OK " + path);
     return null;
   }
   const text = await res.text();
   let json;
-  try { json = JSON.parse(text); } catch { throw new Error("JSONパース失敗 HTTP " + res.status + ": " + text.slice(0,200)); }
-  if (!res.ok || json.error) {
-    const msg = (json.error && json.error.message) || ("HTTP " + res.status);
-    dbg("graphFetch error " + path + ": " + msg);
-    throw new Error(msg);
+  try { json = text ? JSON.parse(text) : {}; }
+  catch(parseErr) {
+    dbg("✗ JSONパース失敗 " + path + " HTTP " + res.status + " body=" + text.slice(0,200));
+    throw new Error("JSONパース失敗 HTTP " + res.status + " [" + path + "]: " + text.slice(0,200));
   }
+  if (!res.ok || json.error) {
+    const msg = (json.error && (json.error.message || json.error.code)) || ("HTTP " + res.status);
+    dbg("✗ " + method + " " + path + " HTTP " + res.status + ": " + msg);
+    throw new Error(msg + " [" + path + "]");
+  }
+  dbg("✓ " + method + " " + path + " HTTP " + res.status);
   return json;
 }
 
@@ -205,45 +286,67 @@ async function graphFetch(token, path, opts = {}) {
 let _siteId = null, _listId = null, _fieldMap = null;
 
 async function ensureIds(token) {
-  if (_siteId && _listId && _fieldMap) return;
+  if (_siteId && _listId && _fieldMap) { dbg("ensureIds: キャッシュ済 site="+_siteId.slice(0,30)+" list="+_listId.slice(0,30)); return; }
 
-  // Step1: ルートサイトからテナントのSharePointホスト名を自動取得
-  const root = await graphFetch(token, `/sites/root?$select=id,webUrl`);
-  const spHostname = new URL(root.webUrl).hostname; // 例: contoso.sharepoint.com
-  dbg("SP hostname: " + spHostname);
-
-  // Step2: 取得したホスト名でサイトにアクセス
-  let site;
+  // ===== Step1: サイトを見つける =====
+  let site = null;
+  // 方法A: /sites/root でテナントのデフォルトSharePointホスト名を取得 → 名前で参照
   try {
-    site = await graphFetch(token, `/sites/${spHostname}:/sites/${SITE_NAME}?$select=id,webUrl,displayName`);
-  } catch(e) {
-    // サイトが見つからない場合は検索にフォールバック
-    dbg("直接アクセス失敗: " + e.message + " → 検索");
-    const searchRes = await graphFetch(token, `/sites?search=${encodeURIComponent(SITE_NAME)}`);
-    dbg("site検索結果: " + JSON.stringify((searchRes.value||[]).map(s=>s.name+"("+s.webUrl+")")));
-    site = (searchRes.value||[]).find(s => s.name === SITE_NAME || (s.displayName||"").includes(SITE_NAME));
-    if (!site) throw new Error("SharePointサイト '" + SITE_NAME + "' が見つかりません。サイト名を確認してください。検索結果: " + (searchRes.value||[]).map(s=>s.name).join(","));
+    dbg("【サイト探索A】/sites/root でホスト名取得");
+    const root = await graphFetch(token, `/sites/root?$select=id,webUrl`);
+    const spHostname = new URL(root.webUrl).hostname;
+    dbg("ホスト名: " + spHostname);
+    site = await graphFetch(token, `/sites/${spHostname}:/sites/${SITE_NAME}?$select=id,webUrl,displayName,name`);
+    dbg("【A】成功: " + site.webUrl);
+  } catch(eA) {
+    dbg("【A】失敗: " + eA.message);
+    // 方法B: サイト検索
+    try {
+      dbg("【サイト探索B】/sites?search で検索");
+      const searchRes = await graphFetch(token, `/sites?search=${encodeURIComponent(SITE_NAME)}`);
+      const results = searchRes.value || [];
+      dbg("検索ヒット " + results.length + "件: " + results.map(s=>(s.name||"?")+":"+(s.webUrl||"?")).join(" / "));
+      site = results.find(s => s.name === SITE_NAME)
+          || results.find(s => (s.webUrl||"").endsWith("/sites/" + SITE_NAME))
+          || results.find(s => (s.displayName||"").includes(SITE_NAME))
+          || results.find(s => (s.name||"").includes(SITE_NAME));
+      if (!site) throw new Error("検索結果に '"+SITE_NAME+"' なし");
+      dbg("【B】成功: " + site.webUrl);
+    } catch(eB) {
+      dbg("【B】失敗: " + eB.message);
+      throw new Error("SharePointサイト '" + SITE_NAME + "' にアクセスできません。原因: " + eA.message + " / " + eB.message);
+    }
   }
   _siteId = site.id;
-  dbg("siteId: " + _siteId + " url=" + site.webUrl);
+  dbg("✓ siteId 確定: " + site.webUrl);
 
-  // リスト一覧を取得して名前で検索
-  const lists = await graphFetch(token, `/sites/${_siteId}/lists?$select=id,displayName`);
-  dbg("lists: " + lists.value.map(l => l.displayName).join(", "));
-
-  // 完全一致 → なければ部分一致
-  let list = lists.value.find(l => l.displayName === "受給者証・契約 対応状況確認表");
-  if (!list) list = lists.value.find(l => l.displayName.includes("受給者証"));
-  if (!list) list = lists.value.find(l => l.displayName.includes("対応状況"));
-  if (!list) { dbg("利用可能なリスト: " + JSON.stringify(lists.value.map(l=>l.displayName))); throw new Error("リストが見つかりません。リスト名を確認してください。"); }
+  // ===== Step2: リストを見つける =====
+  const lists = await graphFetch(token, `/sites/${_siteId}/lists?$select=id,displayName,name`);
+  const allLists = lists.value || [];
+  dbg("リスト一覧(" + allLists.length + "件): " + allLists.map(l => l.displayName).join(" | "));
+  // 候補名（柔軟マッチ）
+  const targetNames = ["受給者証・契約 対応状況確認表","受給者証・契約対応状況確認表","受給者証契約対応状況確認表"];
+  let list = allLists.find(l => targetNames.indexOf(l.displayName) >= 0);
+  if (!list) list = allLists.find(l => (l.displayName||"").indexOf("受給者証") >= 0);
+  if (!list) list = allLists.find(l => (l.displayName||"").indexOf("対応状況") >= 0);
+  if (!list) list = allLists.find(l => (l.displayName||"").indexOf("契約") >= 0 && (l.displayName||"").indexOf("確認") >= 0);
+  if (!list) throw new Error("SharePointリストが見つかりません。利用可能: " + allLists.map(l=>l.displayName).join(", "));
   _listId = list.id;
-  dbg("listId: " + _listId + " (" + list.displayName + ")");
+  dbg("✓ listId 確定: " + list.displayName);
 
-  // フィールド内部名マップを作成
-  const cols = await graphFetch(token, `/sites/${_siteId}/lists/${_listId}/columns`);
+  // ===== Step3: 列の内部名マップを作成 =====
+  const cols = await graphFetch(token, `/sites/${_siteId}/lists/${_listId}/columns?$select=name,displayName,readOnly,hidden`);
   _fieldMap = {};
-  cols.value.forEach(c => { _fieldMap[c.displayName] = c.name; });
-  dbg("fields: " + JSON.stringify(_fieldMap));
+  (cols.value || []).forEach(c => {
+    if (c.readOnly || c.hidden) return; // 読み取り専用・隠し列はスキップ
+    _fieldMap[c.displayName] = c.name;
+  });
+  dbg("✓ 列マップ(" + Object.keys(_fieldMap).length + "個): " + JSON.stringify(_fieldMap));
+
+  // 必須列の存在チェック（警告のみ・エラーにはしない）
+  const required = ["名前","市町村","種別","契約予定日","契約完了","受給者証受取","AURA取込"];
+  const missing = required.filter(n => !_fieldMap[n]);
+  if (missing.length) dbg("⚠ 未マップ必須列: " + missing.join(", ") + " （列名がSharePointと不一致の可能性）");
 }
 
 function fName(displayName) {
@@ -651,7 +754,10 @@ function App() {
             </div>
             <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 }}>
               <span style={{ fontSize:12, opacity:0.8 }}>{userName}</span>
-              <button onClick={handleLogout} style={{ fontSize:12, background:"rgba(255,255,255,0.2)", border:"none", color:"#fff", padding:"5px 12px", borderRadius:20, cursor:"pointer" }}>ログアウト</button>
+              <div style={{ display:"flex", gap:6 }}>
+                <button onClick={()=>window.showDebugViewer()} style={{ fontSize:11, background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", padding:"5px 10px", borderRadius:20, cursor:"pointer" }}>ⓘ ログ</button>
+                <button onClick={handleLogout} style={{ fontSize:12, background:"rgba(255,255,255,0.2)", border:"none", color:"#fff", padding:"5px 12px", borderRadius:20, cursor:"pointer" }}>ログアウト</button>
+              </div>
             </div>
           </div>
           <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
