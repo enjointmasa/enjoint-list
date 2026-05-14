@@ -86,16 +86,11 @@
     .chk-tick { color: #fff; font-size: 14px; line-height: 1; }
     /* トースト */
     .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1E3A5F; color: #fff; padding: 12px 24px; border-radius: 20px; font-size: 14px; font-weight: 600; z-index: 300; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-    /* デバッグパネル */
-    #debug { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #1E293B; color: #94A3B8; font-size: 11px; padding: 8px 12px; z-index: 200; max-height: 200px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; word-break: break-all; }
-    #debug-close { position: fixed; bottom: 204px; right: 8px; z-index: 201; background: #475569; color: #fff; border: none; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
   </style>
 </head>
 <body>
 <div id="err"></div>
 <div id="root"><div class="loading-screen"><div style="font-size:36px">⏳</div><div style="font-size:16px">読み込み中...</div></div></div>
-<button id="debug-close" onclick="document.getElementById('debug').style.display='none';this.style.display='none';" style="display:none">✕ 閉じる</button>
-<div id="debug"></div>
 
 <script>
 /* エラーキャッチ */
@@ -106,14 +101,7 @@ function showErr(msg) {
 }
 window.onerror = function(m,s,l) { showErr('JS Error: ' + m + ' (' + l + ')'); };
 window.onunhandledrejection = function(e) { showErr('Promise Error: ' + (e.reason && e.reason.message || e.reason || e)); };
-function dbg(msg) {
-  var d = document.getElementById('debug');
-  var btn = document.getElementById('debug-close');
-  d.style.display = 'block';
-  if (btn) btn.style.display = 'block';
-  d.textContent += '\n' + msg;
-  d.scrollTop = d.scrollHeight;
-}
+function dbg(msg) { console.log('[DBG]', msg); }
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -144,7 +132,7 @@ try {
     },
     cache: {
       cacheLocation: "localStorage",  // mobileのredirect後もセッション維持
-      storeAuthStateInCookie: true,
+      storeAuthStateInCookie: false,
     },
   });
   dbg("MSAL OK");
