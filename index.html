@@ -325,11 +325,15 @@ async function ensureIds(token) {
   const allLists = lists.value || [];
   dbg("リスト一覧(" + allLists.length + "件): " + allLists.map(l => l.displayName).join(" | "));
   // 候補名（柔軟マッチ）
-  const targetNames = ["受給者証・契約 対応状況確認表","受給者証・契約対応状況確認表","受給者証契約対応状況確認表"];
+  const targetNames = ["クライアント進捗確認リスト_相談","クライアント進捗確認リスト","受給者証・契約 対応状況確認表","受給者証・契約対応状況確認表"];
   let list = allLists.find(l => targetNames.indexOf(l.displayName) >= 0);
+  if (!list) list = allLists.find(l => (l.displayName||"").indexOf("クライアント進捗") >= 0);
+  if (!list) list = allLists.find(l => (l.displayName||"").indexOf("進捗確認") >= 0);
   if (!list) list = allLists.find(l => (l.displayName||"").indexOf("受給者証") >= 0);
   if (!list) list = allLists.find(l => (l.displayName||"").indexOf("対応状況") >= 0);
-  if (!list) list = allLists.find(l => (l.displayName||"").indexOf("契約") >= 0 && (l.displayName||"").indexOf("確認") >= 0);
+  // システムリスト除外
+  const systemLists = ["Web テンプレートの拡張機能","ドキュメント","フォーム","スタイル ライブラリ"];
+  if (!list) list = allLists.find(l => systemLists.indexOf(l.displayName) < 0);
   if (!list) throw new Error("SharePointリストが見つかりません。利用可能: " + allLists.map(l=>l.displayName).join(", "));
   _listId = list.id;
   dbg("✓ listId 確定: " + list.displayName);
