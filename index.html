@@ -351,6 +351,33 @@ async function ensureIds(token) {
   const required = ["名前","市町村","種別","契約予定日","契約完了","受給者証受取","AURA取込"];
   const missing = required.filter(n => !_fieldMap[n]);
   if (missing.length) dbg("⚠ 未マップ必須列: " + missing.join(", ") + " （列名がSharePointと不一致の可能性）");
+
+  // 不足チェックボックス列の自動作成（既存データには影響なし）
+  // 既存行は新列で null になるが、!! でfalse扱いされるだけで他データは消えない
+  const boolCols = ["市役所面談","契約完了","変更届","計画案等提出","受給者証受取","計画書提出","AURA取込"];
+  const textCols = ["市町村","種別","契約予定日","備考①","備考②","担当者会議日程"];
+  for (const dn of boolCols) {
+    if (_fieldMap[dn]) continue;
+    try {
+      dbg("不足列を作成試行(boolean): " + dn);
+      const r = await graphFetch(token, `/sites/${_siteId}/lists/${_listId}/columns`, {
+        method: "POST", body: JSON.stringify({ displayName: dn, boolean: {} })
+      });
+      _fieldMap[dn] = r.name;
+      dbg("✓ 列作成成功: " + dn + " → " + r.name);
+    } catch(e) { dbg("✗ 列作成失敗 " + dn + ": " + e.message); }
+  }
+  for (const dn of textCols) {
+    if (_fieldMap[dn]) continue;
+    try {
+      dbg("不足列を作成試行(text): " + dn);
+      const r = await graphFetch(token, `/sites/${_siteId}/lists/${_listId}/columns`, {
+        method: "POST", body: JSON.stringify({ displayName: dn, text: {} })
+      });
+      _fieldMap[dn] = r.name;
+      dbg("✓ 列作成成功: " + dn + " → " + r.name);
+    } catch(e) { dbg("✗ 列作成失敗 " + dn + ": " + e.message); }
+  }
 }
 
 function fName(displayName) {
