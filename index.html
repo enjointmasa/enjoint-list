@@ -354,7 +354,8 @@ async function ensureIds(token) {
 
   // 不足チェックボックス列の自動作成（既存データには影響なし）
   // 既存行は新列で null になるが、!! でfalse扱いされるだけで他データは消えない
-  const boolCols = ["市役所面談","契約完了","変更届","計画案等提出","受給者証受取","計画書提出","AURA取込"];
+  // SharePointの実列名「役所での面談」は既存。市役所面談は新規作成しない
+  const boolCols = ["契約完了","変更届","計画案等提出","受給者証受取","計画書提出","AURA取込"];
   const textCols = ["市町村","種別","契約予定日","備考①","備考②","担当者会議日程"];
   for (const dn of boolCols) {
     if (_fieldMap[dn]) continue;
@@ -394,7 +395,7 @@ function itemToRecord(item) {
     name:         f[fName("名前")]          || f.Title || f["名前"] || "",
     area:         f[fName("市町村")]         || f["市町村"] || "",
     type:         f[fName("種別")]           || f["種別"] || "",
-    cityMeeting:  !!(f[fName("市役所面談")] ?? f["市役所面談"]),
+    cityMeeting:  !!(f[fName("役所での面談")] ?? f[fName("市役所面談")] ?? f["役所での面談"] ?? f["市役所面談"]),
     scheduleDate: f[fName("契約予定日")]     || f["契約予定日"] || "",
     memo1:        f[fName("備考①")]          || f["備考①"] || "",
     contracted:   !!(f[fName("契約完了")]    ?? f["契約完了"]),
@@ -422,7 +423,9 @@ function recordToFields(r) {
   setField("名前",          r.name || "");
   setField("市町村",         r.area || "");
   setField("種別",           r.type || "");
-  setField("市役所面談",     !!r.cityMeeting);
+  // SharePointの実列名は「役所での面談」。旧名「市役所面談」もフォールバックで対応
+  if (_fieldMap && _fieldMap["役所での面談"]) setField("役所での面談", !!r.cityMeeting);
+  else setField("市役所面談", !!r.cityMeeting);
   setField("契約予定日",     r.scheduleDate || "");
   setField("備考①",          r.memo1 || "");
   setField("契約完了",       !!r.contracted);
